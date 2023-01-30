@@ -11,19 +11,17 @@ YYLVALTYPE yylval;
 
 YYLVALTYPE convert_to_str(char* character, int len) {
     int has_prefix = character[0] != '"';
-    has_prefix = has_prefix + has_prefix*(character[1] == '8');
-    printf("has_prefix: %d\n", has_prefix);
-    int t_len = len - 2 - has_prefix + 1;
-    printf("len: %d\n",t_len);
+    int prefix_count = has_prefix + has_prefix*(character[1] == '8');
+    int t_len = len - 2 - prefix_count + 1; // len - 2("") - prefix + 1(\0)
     char* str = (char* ) malloc(sizeof(char) * t_len); // TODO free this after use
-    sscanf(character+has_prefix, "\"%s\"", str); // NOTE this is techincaly grabbing the last " but i remove it anyway
+    sscanf(character+prefix_count, "\"%s\"", str); // NOTE this is techincaly grabbing the last " but i remove it anyway
     str[t_len-1] = 0;
     NVALTYPE num;
     num.str = str;
     YYLVALTYPE r_val;
     r_val.value = num;
     r_val.type = Tu8;
-    if (has_prefix == 1) {
+    if (prefix_count == 1) {
         switch(character[0]) {
             case 'u': r_val.type = Tu; break;
             case 'U': r_val.type = TU; break;
@@ -46,8 +44,8 @@ YYLVALTYPE convert_to_char(char* character, int len) {
 
     switch(prefix) {
         case 'L': r_val.type = TWCHAR; break;
-        case 'u': r_val.type = TCHAR16;break;
-        case 'U': r_val.type = TCHAR32;break;
+        case 'U': r_val.type = TCHAR32; break;
+        case 'u': r_val.type = TCHAR16; break;
         default: r_val.type = TUCHAR; break;
     }
     return r_val;
@@ -155,7 +153,7 @@ YYLVALTYPE convert_to_int(char* number, int len, int base) {
             break;
         }
         default: {
-            fprintf(stderr,"Internal Compiler Error matched integer returns float type");
+            fprintf(stderr,"Internal Compiler Error matched integer returns non-integer type");
             exit(1);
         }
     }
