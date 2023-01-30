@@ -72,9 +72,34 @@ typedef enum {
   _THREAD_LOCAL,
   __FUNC__,
 } Tokens;
+typedef enum {
+  TINT,
+  TLONG,
+  TLONGLONG,
+  TUINT,
+  TULONG,
+  TULONGLONG,
+  TDOUBLE,
+  TFLOAT,
+  TLONGDOUBLE,
+  TUCHAR,
+  TWCHAR,
+  TCHAR16,
+  TCHAR32,
+  Tu8,
+  Tu,
+  TU,
+  TL,
+} ConstantTypes;
 
 typedef union {
   unsigned long long u_int;
-  long long i_int;
   double flt;
-} YYSTYPE;
+  unsigned char chr;
+  char *str;
+} NVALTYPE;
+
+typedef struct {
+  NVALTYPE value;
+  ConstantTypes type;
+} YYLVALTYPE;
