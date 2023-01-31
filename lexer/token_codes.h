@@ -1,3 +1,4 @@
+#pragma once
 typedef enum {
   TOKEOF = 0,
   IDENT = 257, /* This is where yacc will put it */
