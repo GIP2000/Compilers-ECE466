@@ -71,7 +71,7 @@ typedef enum {
   _NORETURN,
   _STATIC_ASSERT,
   _THREAD_LOCAL,
-  __FUNC__,
+  LN,
 } Tokens;
 typedef enum {
   TINT,
@@ -93,14 +93,20 @@ typedef enum {
   TL,
 } ConstantTypes;
 
+typedef struct {
+  char *file_name;
+  int file_line_start;
+  int real_line_start;
+} FileInfo;
+
 typedef union {
   unsigned long long u_int;
   double flt;
   unsigned char chr;
   char *str;
-} NVALTYPE;
+} YYNVal;
 
 typedef struct {
-  NVALTYPE value;
+  YYNVal value;
   ConstantTypes type;
 } YYLVALTYPE;

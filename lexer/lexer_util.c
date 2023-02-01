@@ -5,6 +5,14 @@
 #include <stdlib.h>
 #include <string.h>
 
+void get_file_info(char *file_info_str, int length, FileInfo *file_info) {
+  free(file_info->file_name);
+  file_info->file_name = malloc(sizeof(char) * length);
+  sscanf(file_info_str, "# %d \"%s\"%*s", &(file_info->file_line_start),
+         file_info->file_name);
+  file_info->file_line_start--;
+}
+
 YYLVALTYPE convert_to_str(char *character, int len) {
   int has_prefix = character[0] != '"';
   int prefix_count = has_prefix + has_prefix * (character[1] == '8');
@@ -14,7 +22,7 @@ YYLVALTYPE convert_to_str(char *character, int len) {
          str); // NOTE this is techincaly grabbing the last " but i remove it
                // anyway
   str[t_len - 1] = 0;
-  NVALTYPE num;
+  YYNVal num;
   num.str = str;
   YYLVALTYPE r_val;
   r_val.value = num;
@@ -42,8 +50,18 @@ YYLVALTYPE convert_to_char(char *character, int len) {
   char prefix = character[0];
   int has_prefix = prefix != '\'';
   char val;
-  sscanf(character + has_prefix, "'%c'", &val);
-  NVALTYPE num;
+  if (len - has_prefix - 2 == 1) {
+    sscanf(character + has_prefix, "'%c'", &val);
+  } else {
+    char full_char[len - has_prefix - 2];
+    int i;
+    for (i = has_prefix + 1; i < len - 1; ++i) {
+      char c = character[i];
+      sprintf(full_char, "%c", c);
+    }
+  }
+
+  YYNVal num;
   num.chr = val;
   YYLVALTYPE r_val;
   r_val.value = num;
@@ -73,7 +91,7 @@ YYLVALTYPE convert_to_float(char *number, int len, int base) {
   }
   long double val;
   sscanf(number, format_string, &val);
-  NVALTYPE num;
+  YYNVal num;
   num.flt = val;
   YYLVALTYPE r_val;
   r_val.value = num;
@@ -120,7 +138,7 @@ YYLVALTYPE convert_to_int(char *number, int len, int base) {
 
   // stores the number
   sscanf(number, format_string, &val);
-  NVALTYPE num;
+  YYNVal num;
   num.u_int = val;
   YYLVALTYPE r_val;
   r_val.value = num;

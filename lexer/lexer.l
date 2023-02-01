@@ -4,8 +4,10 @@
 #include "./lexer/token_codes.h"
 #include "./lexer/lexer_util.h"
 YYLVALTYPE yylval;
+FileInfo file_info;
 %}
 %%
+#\ [0-9]+\ \".+\"(\ [0-9]+)* {file_info.real_line_start = yylineno;get_file_info(yytext, yyleng, &file_info); return LN;}
 auto {return AUTO;}
 break {return BREAK;}
 case {return CASE;}
@@ -50,7 +52,6 @@ _Imaginary {return _IMAGINARY;}
 _Noreturn {return _NORETURN;}
 _Static_assert {return _STATIC_ASSERT;}
 _Thread_local {return _THREAD_LOCAL;}
-__func__ {return __FUNC__;}
 [A-Za-z_][A-Za-z_0-9]* {return IDENT;}
 0[0-7]*[Uu]?[Ll]?[Ll]? {yylval = convert_to_int(yytext, yyleng, 8);return NUMBER;}
 [1-9][0-9]*[Uu]?[Ll]?[Ll]? {yylval = convert_to_int(yytext, yyleng, 10);return NUMBER;}
@@ -61,7 +62,7 @@ __func__ {return __FUNC__;}
 0x[A-Fa-f0-9]+\.([pP][+-]?[0-9]+)?[FfLl]? {yylval = convert_to_float(yytext, yyleng, 16);return NUMBER;}
 [LUu]?\'([^'\\\n]|(\\(['"?\\abfnrtv]|[0-7][0-7]?[0-7]?))|(\\x[0-9A-Fa-f][0-9A-Fa-f]?))' {yylval = convert_to_char(yytext, yyleng);return CHARLIT;}
 (u8|u|U|L)?\"([^\"\\\n]|(\\(['"?\\abfnrtv]|[0-7][0-7]?[0-7]?))|(\\x[0-9A-Fa-f][0-9A-Fa-f]?))*\" {yylval = convert_to_str(yytext,yyleng); return STRING;}
-[\[\]\(\)\{\}\.\&\*\+~!\/%<>\^\|\?:;=,#] {return yytext[0];}
+[\[\]\(\)\{\}\.\&\*\+~!\/%<>\^\|\?:;=,] {return yytext[0];}
 -> {return INDSEL;}
 \+\+ {return PLUSPLUS;}
 -- {return MINUSMINUS;}
@@ -85,5 +86,5 @@ __func__ {return __FUNC__;}
 \|=  {return OREQ;}
 \^=  {return XOREQ;}
 [\n ] {}
-.                           {fprintf(stderr, "Error: Unkown Token (%s)\n", yytext);}
+.                           {fprintf(stderr, "%s:%d: Error: Unkown Token (%s)\n", file_info.file_name,yylineno - file_info.real_line_start + file_info.file_line_start, yytext); exit(1);}
 %%

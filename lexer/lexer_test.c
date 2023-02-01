@@ -1,18 +1,27 @@
 #include "./lexer_util.h"
 #include "./token_codes.h"
+#include <limits.h>
 #include <stdio.h>
 #include <stdlib.h>
+#include <string.h>
 
-extern FILE *yyin;
-extern int yylex(void);
-extern YYLVALTYPE yylval;
-
+FILE *yyin;
+int yylex(void);
+YYLVALTYPE yylval;
+FileInfo file_info;
 int lex_file();
 
 int main(int argc, char **argv) {
   if (argc <= 1) {
-    fprintf(stderr, "Usage: ./lex_test.out {...path_to_file.c}");
+    file_info.file_line_start = 0;
+    file_info.real_line_start = 0;
+    char *temp = "stdin";
+    file_info.file_name = (char *)malloc(sizeof(char) * 6);
+    strcpy(file_info.file_name, temp);
+    lex_file();
+    return 0;
   }
+
   int i;
   for (i = 1; i < argc; ++i) {
     FILE *temp = fopen(argv[i], "r");
@@ -20,6 +29,13 @@ int main(int argc, char **argv) {
       fprintf(stderr, "Error opening file %s", argv[i]);
       return 1;
     }
+    file_info.file_line_start = 0;
+    if (file_info.file_name != NULL) {
+      free(file_info.file_name);
+    }
+    file_info.file_name =
+        (char *)malloc(sizeof(char) * strnlen(argv[i], PATH_MAX));
+    strncpy(file_info.file_name, argv[i], PATH_MAX);
     yyin = temp;
     lex_file();
   }
@@ -247,11 +263,14 @@ int lex_file() {
     case _THREAD_LOCAL:
       printf("_THREAD_LOCAL\n");
       break;
+    case LN:
+      printf("LNA -> cf = %s, ln = %d\n", file_info.file_name,
+             file_info.file_line_start);
+      break;
     default:
       printf("%c\n", t);
       break;
     }
   }
-  printf("EOF\n");
   return 0;
 }
