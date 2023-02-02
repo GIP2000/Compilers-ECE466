@@ -17,16 +17,45 @@ YYLVALTYPE convert_to_str(char *character, int len) {
   int has_prefix = character[0] != '"';
   int prefix_count = has_prefix + has_prefix * (character[1] == '8');
   int t_len = len - 2 - prefix_count + 1; // len - 2("") - prefix + 1(\0)
-  char *str = (char *)malloc(sizeof(char) * t_len); // TODO free this after use
-  sscanf(character + prefix_count, "\"%s\"",
-         str); // NOTE this is techincaly grabbing the last " but i remove it
-               // anyway
+  char *str = (char *)malloc(sizeof(char) * t_len); // TODO free this after user
+  strncpy(str, character + prefix_count + 1, t_len);
   str[t_len - 1] = 0;
+  // gets the true str length
+  int i;
+  int true_str_len = 0;
+  for (i = 0; i < t_len - 1; ++i) {
+    if (str[i] == '\\') {
+      if (str[i + 1] == '\\') {
+        ++true_str_len;
+        ++i;
+      } else if (str[i + 1] == 'x') {
+        i += 2;
+        if (i + 1 < t_len - 1 && isxdigit(str[i + 1])) {
+          ++i;
+        }
+        ++true_str_len;
+      } else if (isdigit(str[i + 1])) {
+        ++i;
+        int j;
+        // check the next two
+        // TODO CODE IS UGLY AND BAD
+        for (j = 0; j < 2; ++j) {
+          if (i + 1 < t_len - 1 && isdigit(str[i + 1])) {
+            ++i;
+          }
+        }
+        ++true_str_len;
+      }
+      continue;
+    }
+    ++true_str_len;
+  }
   YYNVal num;
   num.str = str;
   YYLVALTYPE r_val;
   r_val.value = num;
   r_val.type = Tu8;
+  r_val.str_len = true_str_len;
   if (prefix_count == 1) {
     switch (character[0]) {
     case 'u':
@@ -50,14 +79,54 @@ YYLVALTYPE convert_to_char(char *character, int len) {
   char prefix = character[0];
   int has_prefix = prefix != '\'';
   char val;
-  if (len - has_prefix - 2 == 1) {
-    sscanf(character + has_prefix, "'%c'", &val);
-  } else {
-    char full_char[len - has_prefix - 2];
-    int i;
-    for (i = has_prefix + 1; i < len - 1; ++i) {
-      char c = character[i];
-      sprintf(full_char, "%c", c);
+  if (character[has_prefix + 1] != '\\')
+    val = character[has_prefix + 1];
+  else {
+    switch (character[has_prefix + 2]) {
+    case '\'':
+      val = '\'';
+      break;
+    case '"':
+      val = '\"';
+      break;
+    case '?':
+      val = '\?';
+      break;
+    case '\\':
+      val = '\\';
+      break;
+    case 'a':
+      val = '\a';
+      break;
+    case 'b':
+      val = '\b';
+      break;
+    case 'f':
+      val = '\f';
+      break;
+    case 'n':
+      val = '\n';
+      break;
+    case 'r':
+      val = '\r';
+      break;
+    case 't':
+      val = '\t';
+      break;
+    case 'v':
+      val = '\v';
+      break;
+    case 'x': {
+      int c_code;
+      sscanf(character + has_prefix, "'\\x%x'", &c_code);
+      val = c_code;
+      break;
+    }
+    default: {
+      int c_code;
+      sscanf(character + has_prefix, "'\\%o'", &c_code);
+      val = c_code;
+    }
     }
   }
 

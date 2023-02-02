@@ -54,7 +54,8 @@ int lex_file() {
       printf("CHARLIT: %c %d\n", yylval.value.chr, yylval.type);
       break;
     case STRING:
-      printf("STRING: %s %d\n", yylval.value.str, yylval.type);
+      printf("STRING: %s %d %d\n", yylval.value.str, yylval.type,
+             yylval.str_len);
       break;
     case NUMBER: {
       if (yylval.type > 5) {

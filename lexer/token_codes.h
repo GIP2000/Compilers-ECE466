@@ -109,4 +109,5 @@ typedef union {
 typedef struct {
   YYNVal value;
   ConstantTypes type;
+  int str_len;
 } YYLVALTYPE;
