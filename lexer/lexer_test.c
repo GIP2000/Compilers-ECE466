@@ -10,6 +10,8 @@ int yylex(void);
 YYLVALTYPE yylval;
 FileInfo file_info;
 int lex_file();
+int yylineno;
+char *yytext;
 
 int main(int argc, char **argv) {
   if (argc <= 1) {
@@ -43,26 +45,28 @@ int main(int argc, char **argv) {
 int lex_file() {
   int t;
   while ((t = yylex())) {
+    printf("%-16s %-20d", file_info.file_name,
+           yylineno - file_info.real_line_start + file_info.file_line_start);
     switch (t) {
     case TOKEOF:
       printf("TOKEOF\n");
       break;
     case IDENT:
-      printf("IDENT\n");
+      printf("IDENT (%s)\n", yytext);
       break;
     case CHARLIT:
-      printf("CHARLIT: %c %d\n", yylval.value.chr, yylval.type);
+      printf("CHARLIT %c %d\n", yylval.value.chr, yylval.type);
       break;
     case STRING:
-      printf("STRING: %s %d %d\n", yylval.value.str, yylval.type,
+      printf("STRING %s %d %d\n", yylval.value.str, yylval.type,
              yylval.str_len);
       break;
     case NUMBER: {
       if (yylval.type > 5) {
-        printf("NUMBER: %lf %d\n", yylval.value.flt, yylval.type);
+        printf("NUMBER %lf %d\n", yylval.value.flt, yylval.type);
         break;
       }
-      printf("NUMBER: %llu %d\n", yylval.value.u_int, yylval.type);
+      printf("NUMBER %llu %d\n", yylval.value.u_int, yylval.type);
       break;
     }
 

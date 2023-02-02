@@ -53,16 +53,16 @@ _Noreturn {return _NORETURN;}
 _Static_assert {return _STATIC_ASSERT;}
 _Thread_local {return _THREAD_LOCAL;}
 [A-Za-z_][A-Za-z_0-9]* {return IDENT;}
-0[0-7]*[Uu]?[Ll]?[Ll]? {yylval = convert_to_int(yytext, yyleng, 8);return NUMBER;}
-[1-9][0-9]*[Uu]?[Ll]?[Ll]? {yylval = convert_to_int(yytext, yyleng, 10);return NUMBER;}
-0x[0-9A-Fa-f]+[Uu]?[Ll]?[Ll]? {yylval = convert_to_int(yytext, yyleng, 16);return NUMBER;}
-[0-9]*\.[0-9]+([eE][+-]?[0-9]+)?[FfLl]? {yylval = convert_to_float(yytext, yyleng, 10);return NUMBER;}
-[0-9]+\.([eE][+-]?[0-9]+)?[FfLl]? {yylval = convert_to_float(yytext, yyleng, 10);return NUMBER;}
-0x[A-Fa-f0-9]*\.[A-Fa-f0-9]+([pP][+-]?[0-9]+)?[FfLl]? {yylval = convert_to_float(yytext, yyleng, 16);return NUMBER;}
-0x[A-Fa-f0-9]+\.([pP][+-]?[0-9]+)?[FfLl]? {yylval = convert_to_float(yytext, yyleng, 16);return NUMBER;}
-[LUu]?\'([^'\\\n]|(\\(['"?\\abfnrtv]|[0-7][0-7]?[0-7]?))|(\\x[0-9A-Fa-f][0-9A-Fa-f]?))' {yylval = convert_to_char(yytext, yyleng);return CHARLIT;}
+0[0-7]*([uU][lL][lL]|[uU][lL]?|[lL][uU]?|[lL][lL][uU]?)? {yylval = convert_to_int(yytext, yyleng, 8);return NUMBER;}
+[1-9][0-9]*([uU][lL][lL]|[uU][lL]?|[lL][uU]?|[lL][lL][uU]?)? {yylval = convert_to_int(yytext, yyleng, 10);return NUMBER;}
+0x[0-9A-Fa-f]+([uU][lL][lL]|[uU][lL]?|[lL][uU]?|[lL][lL][uU]?)? {yylval = convert_to_int(yytext, yyleng, 16);return NUMBER;}
+([0-9]*\.[0-9]+)|([0-9]+\.)([eE][+-]?[0-9]+)?[fFlL]? {yylval = convert_to_float(yytext, yyleng, 10);return NUMBER;}
+[0-9]+[eE][+-]?[0-9]+[FfLl]? {yylval = convert_to_float(yytext, yyleng, 10);return NUMBER;}
+0x[A-Fa-f0-9]*\.[A-Fa-f0-9]+[pP][+-]?[0-9]+[FfLl]? {yylval = convert_to_float(yytext, yyleng, 16);return NUMBER;}
+0x[A-Fa-f0-9]+[pP][+-]?[0-9]+[FfLl]? {yylval = convert_to_float(yytext, yyleng, 16);return NUMBER;}
+[LUu]?\'([^'\\\n]|(\\(['"?\\abfnrtv]|[0-7][0-7]?[0-7]?))|(\\x[0-9A-Fa-f]+))+' {yylval = convert_to_char(yytext, yyleng);return CHARLIT;}
 (u8|u|U|L)?\"([^\"\\\n]|(\\(['"?\\abfnrtv]|[0-7][0-7]?[0-7]?))|(\\x[0-9A-Fa-f][0-9A-Fa-f]?))*\" {yylval = convert_to_str(yytext,yyleng); return STRING;}
-[\[\]\(\)\{\}\.\&\*\+~!\/%<>\^\|\?:;=,] {return yytext[0];}
+[\[\]\(\)\{\}\.\&\*\+~!\/%<>\^\|\?:;=,-] {return yytext[0];}
 -> {return INDSEL;}
 \+\+ {return PLUSPLUS;}
 -- {return MINUSMINUS;}
@@ -86,5 +86,5 @@ _Thread_local {return _THREAD_LOCAL;}
 \|=  {return OREQ;}
 \^=  {return XOREQ;}
 [\n ] {}
-.                           {fprintf(stderr, "%s:%d: Error: Unkown Token (%s)\n", file_info.file_name,yylineno - file_info.real_line_start + file_info.file_line_start, yytext); exit(1);}
+.                           {fprintf(stderr, "%s:%d: Error: Unkown Token (%s)\n", file_info.file_name,yylineno - file_info.real_line_start + file_info.file_line_start, yytext); }
 %%

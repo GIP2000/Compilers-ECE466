@@ -16,8 +16,9 @@ void get_file_info(char *file_info_str, int length, FileInfo *file_info) {
 YYLVALTYPE convert_to_str(char *character, int len) {
   int has_prefix = character[0] != '"';
   int prefix_count = has_prefix + has_prefix * (character[1] == '8');
+
   int t_len = len - 2 - prefix_count + 1; // len - 2("") - prefix + 1(\0)
-  char *str = (char *)malloc(sizeof(char) * t_len); // TODO free this after user
+  char *str = (char *)malloc(sizeof(char) * t_len); // TODO free this after use
   strncpy(str, character + prefix_count + 1, t_len);
   str[t_len - 1] = 0;
   // gets the true str length
@@ -26,27 +27,17 @@ YYLVALTYPE convert_to_str(char *character, int len) {
   for (i = 0; i < t_len - 1; ++i) {
     if (str[i] == '\\') {
       if (str[i + 1] == '\\') {
-        ++true_str_len;
         ++i;
       } else if (str[i + 1] == 'x') {
-        i += 2;
-        if (i + 1 < t_len - 1 && isxdigit(str[i + 1])) {
-          ++i;
-        }
-        ++true_str_len;
-      } else if (isdigit(str[i + 1])) {
         ++i;
-        int j;
-        // check the next two
-        // TODO CODE IS UGLY AND BAD
-        for (j = 0; j < 2; ++j) {
-          if (i + 1 < t_len - 1 && isdigit(str[i + 1])) {
-            ++i;
-          }
+        for (; i < t_len - 1 && isxdigit(str[i + 1]); ++i) {
         }
-        ++true_str_len;
+      } else if (isdigit(str[i + 1])) {
+        for (; i < t_len - 1 && isdigit(str[i + 1]); ++i) {
+        }
+      } else {
+        continue;
       }
-      continue;
     }
     ++true_str_len;
   }
@@ -156,7 +147,7 @@ YYLVALTYPE convert_to_float(char *number, int len, int base) {
   char last = number[len - 1];
   char *format_string = "%LF%*s";
   if (base == 16) {
-    format_string = "0x%La%*s";
+    format_string = "%La";
   }
   long double val;
   sscanf(number, format_string, &val);
@@ -176,6 +167,14 @@ YYLVALTYPE convert_to_int(char *number, int len, int base) {
   if (base == 16) {
     format_string = "0x%llx%*s";
   } else if (base == 8) {
+    if (len == 1) {
+      YYNVal num;
+      num.u_int = 0;
+      YYLVALTYPE r_val;
+      r_val.value = num;
+      r_val.type = TINT;
+      return r_val;
+    }
     format_string = "0%llo%*s";
   } else if (base != 10) {
     fprintf(stderr, "ERROR convert_to_int called with invalid base (error "
@@ -194,15 +193,13 @@ YYLVALTYPE convert_to_int(char *number, int len, int base) {
   }
   int start_suffix = i;
   int is_unsigned = 0;
-  if (i < end &&
-      (last_three[i] == 'U' || last_three[i] == 'u')) { // checks if unsigned
-    ++i;
-    is_unsigned = 1;
-  }
 
-  for (; i < end; ++i) { // counts length
-    if (!(last_three[i] == 'L' || last_three[i] == 'l'))
+  for (; i < end; ++i) {
+    if (!(last_three[i] == 'L' || last_three[i] == 'l' ||
+          last_three[i] == 'u' || last_three[i] == 'U')) {
       break;
+    }
+    is_unsigned = is_unsigned || last_three[i] == 'u' || last_three[i] == 'U';
   }
 
   // stores the number
