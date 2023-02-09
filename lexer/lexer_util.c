@@ -1,10 +1,11 @@
 #include "./lexer_util.h"
-#include "./token_codes.h"
 #include <ctype.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+
 char convert_to_escaped(char escaped_char);
+
 void get_file_info(char *file_info_str, int length, FileInfo *file_info) {
     free(file_info->file_name);
     file_info->file_name = malloc(sizeof(char) * length);

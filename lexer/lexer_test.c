@@ -65,10 +65,10 @@ int lex_file() {
             break;
         case NUMBER: {
             if (yylval.type > 5) {
-                printf("NUMBER %lf %d\n", yylval.value.flt, yylval.type);
+                printf("NUMBER %Lg %d\n", yylval.value.flt, yylval.type);
                 break;
             }
-            printf("NUMBER %llu %d\n", yylval.value.u_int, yylval.type);
+            printf("NUMBER %lld %d\n", yylval.value.u_int, yylval.type);
             break;
         }
 
