@@ -55,7 +55,8 @@ int lex_file() {
       printf("IDENT (%s)\n", yytext);
       break;
     case CHARLIT:
-      printf("CHARLIT %c %d\n", yylval.value.chr, yylval.type);
+      printf("CHARLIT %c(%d) %d\n", yylval.value.chr, (int)yylval.value.chr,
+             yylval.type);
       break;
     case STRING:
       printf("STRING %s %d %d\n", yylval.value.str, yylval.type,

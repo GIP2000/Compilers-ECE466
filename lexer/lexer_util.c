@@ -4,7 +4,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-
+char convert_to_escaped(char escaped_char);
 void get_file_info(char *file_info_str, int length, FileInfo *file_info) {
   free(file_info->file_name);
   file_info->file_name = malloc(sizeof(char) * length);
@@ -18,31 +18,65 @@ YYLVALTYPE convert_to_str(char *character, int len) {
   int prefix_count = has_prefix + has_prefix * (character[1] == '8');
 
   int t_len = len - 2 - prefix_count + 1; // len - 2("") - prefix + 1(\0)
-  char *str = (char *)malloc(sizeof(char) * t_len); // TODO free this after use
-  strncpy(str, character + prefix_count + 1, t_len);
-  str[t_len - 1] = 0;
+  // use
+  char pre_str[t_len];
+  char post_str[t_len];
+  strncpy(pre_str, character + prefix_count + 1, t_len);
+  pre_str[t_len - 1] = 0;
   // gets the true str length
+  // and parsing the str properly
   int i;
   int true_str_len = 0;
-  for (i = 0; i < t_len - 1; ++i) {
-    if (str[i] == '\\') {
-      if (str[i + 1] == '\\') {
+  for (i = 0; i < t_len; ++i) {
+    if (pre_str[i] == '\\') {
+      if (pre_str[i + 1] == '\\') {
         ++i;
-      } else if (str[i + 1] == 'x') {
+      } else if (pre_str[i + 1] == 'x') {
         ++i;
-        for (; i < t_len - 1 && isxdigit(str[i + 1]); ++i) {
+        int count;
+        char val = 0;
+        for (count = 0; i < t_len - 1 && isxdigit(pre_str[i + 1]);
+             ++i, ++count) {
+          if (count == 2) {
+            // only print the warning once
+            fprintf(stderr, "Warning hex defined char code is too long\n");
+          } else {
+            char str_num[2] = {pre_str[i + 1], 0};
+            val <<= 4;
+            val |= (char)strtol(str_num, NULL, 16);
+          }
         }
-      } else if (isdigit(str[i + 1])) {
-        for (; i < t_len - 1 && isdigit(str[i + 1]); ++i) {
+        post_str[true_str_len++] = val;
+        continue;
+      } else if (isdigit(pre_str[i + 1])) {
+        char val = 0;
+        int count;
+        for (count = 0; i < t_len - 1 && isdigit(pre_str[i + 1]) && count < 3;
+             ++i, ++count) {
+          val <<= 3;
+          char str_num[] = {pre_str[i + 1], 0};
+          val |= (char)strtol(str_num, NULL, 8);
         }
+        post_str[true_str_len++] = val;
+        continue;
       } else {
+        char val = convert_to_escaped(pre_str[++i]);
+        if (val == -1) {
+          fprintf(
+              stderr,
+              "Internal Compiler error tried to esape a non-escapable char");
+          exit(1);
+        }
+        post_str[true_str_len++] = val;
         continue;
       }
     }
-    ++true_str_len;
+    post_str[true_str_len++] = pre_str[i];
   }
+  char *final_str = (char *)malloc(true_str_len * sizeof(char));
+  strncpy(final_str, post_str, true_str_len);
   YYNVal num;
-  num.str = str;
+  num.str = final_str;
   YYLVALTYPE r_val;
   r_val.value = num;
   r_val.type = Tu8;
@@ -66,6 +100,45 @@ YYLVALTYPE convert_to_str(char *character, int len) {
   return r_val;
 }
 
+char convert_to_escaped(char escaped_char) {
+  char val = 0;
+  switch (escaped_char) {
+  case 'v':
+    val = '\v';
+    break;
+  case 't':
+    val = '\t';
+    break;
+  case 'r':
+    val = '\r';
+    break;
+  case 'n':
+    val = '\n';
+    break;
+  case 'f':
+    val = '\f';
+    break;
+  case 'b':
+    val = '\b';
+    break;
+  case 'a':
+    val = '\a';
+    break;
+  case '?':
+    val = '\?';
+    break;
+  case '"':
+    val = '\"';
+    break;
+  case '\'':
+    val = '\'';
+    break;
+  default:
+    val = -1;
+  }
+  return val;
+}
+
 YYLVALTYPE convert_to_char(char *character, int len) {
   char prefix = character[0];
   int has_prefix = prefix != '\'';
@@ -73,51 +146,14 @@ YYLVALTYPE convert_to_char(char *character, int len) {
   if (character[has_prefix + 1] != '\\')
     val = character[has_prefix + 1];
   else {
-    switch (character[has_prefix + 2]) {
-    case '\'':
-      val = '\'';
-      break;
-    case '"':
-      val = '\"';
-      break;
-    case '?':
-      val = '\?';
-      break;
-    case '\\':
-      val = '\\';
-      break;
-    case 'a':
-      val = '\a';
-      break;
-    case 'b':
-      val = '\b';
-      break;
-    case 'f':
-      val = '\f';
-      break;
-    case 'n':
-      val = '\n';
-      break;
-    case 'r':
-      val = '\r';
-      break;
-    case 't':
-      val = '\t';
-      break;
-    case 'v':
-      val = '\v';
-      break;
-    case 'x': {
+    val = convert_to_escaped(character[has_prefix + 2]);
+    if (val == -1) {
+      char *format_string = "'\\%o'";
+      if (character[has_prefix + 2] == 'x')
+        format_string = "'\\x%x'";
       int c_code;
       sscanf(character + has_prefix, "'\\x%x'", &c_code);
       val = c_code;
-      break;
-    }
-    default: {
-      int c_code;
-      sscanf(character + has_prefix, "'\\%o'", &c_code);
-      val = c_code;
-    }
     }
   }
 
@@ -253,8 +289,8 @@ YYLVALTYPE convert_to_int(char *number, int len, int base) {
     break;
   }
   default: {
-    fprintf(stderr,
-            "Internal Compiler Error matched integer returns non-integer type");
+    fprintf(stderr, "Internal Compiler Error matched integer returns "
+                    "non-integer type");
     exit(1);
   }
   }
