@@ -53,7 +53,7 @@ int lex_file() {
             printf("TOKEOF\n");
             break;
         case IDENT:
-            printf("IDENT (%s)\n", yytext);
+            printf("IDENT (%s)\n", yylval.value.str);
             break;
         case CHARLIT:
             printf("CHARLIT %c(%d) %d\n", yylval.value.chr,
