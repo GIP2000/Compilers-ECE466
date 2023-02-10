@@ -52,7 +52,7 @@ _Imaginary {return _IMAGINARY;}
 _Noreturn {return _NORETURN;}
 _Static_assert {return _STATIC_ASSERT;}
 _Thread_local {return _THREAD_LOCAL;}
-[A-Za-z_][A-Za-z_0-9]* {return IDENT;}
+[A-Za-z_][A-Za-z_0-9]* {yylval = convert_to_ident(yytext, yyleng);return IDENT;}
 0[0-7]*([uU][lL][lL]|[uU][lL]?|[lL][uU]?|[lL][lL][uU]?)? {yylval = convert_to_int(yytext, yyleng, 8);return NUMBER;}
 [1-9][0-9]*([uU][lL][lL]|[uU][lL]?|[lL][uU]?|[lL][lL][uU]?)? {yylval = convert_to_int(yytext, yyleng, 10);return NUMBER;}
 0x[0-9A-Fa-f]+([uU][lL][lL]|[uU][lL]?|[lL][uU]?|[lL][lL][uU]?)? {yylval = convert_to_int(yytext, yyleng, 16);return NUMBER;}

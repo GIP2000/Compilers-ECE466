@@ -14,6 +14,12 @@ void get_file_info(char *file_info_str, int length, FileInfo *file_info) {
     file_info->file_line_start--;
 }
 
+YYLVALTYPE convert_to_ident(char *ident, int len) {
+    YYLVALTYPE ret;
+    ret.value.str = strndup(ident, len);
+    return ret;
+}
+
 YYLVALTYPE convert_to_str(char *character, int len) {
     int has_prefix = character[0] != '"';
     int prefix_count = has_prefix + has_prefix * (character[1] == '8');
