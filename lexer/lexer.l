@@ -1,9 +1,8 @@
 %option noyywrap
 %option yylineno
 %{
-#include "./lexer/token_codes.h"
 #include "./lexer/lexer_util.h"
-YYLVALTYPE yylval;
+#include "./parser.tab.h"
 FileInfo file_info;
 %}
 %%

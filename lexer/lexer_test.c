@@ -1,5 +1,5 @@
+#include "../parser.tab.h"
 #include "./lexer_util.h"
-#include "./token_codes.h"
 #include <limits.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -7,7 +7,7 @@
 
 FILE *yyin;
 int yylex(void);
-YYLVALTYPE yylval;
+YYSTYPE yylval;
 FileInfo file_info;
 int lex_file();
 int yylineno;
@@ -49,26 +49,23 @@ int lex_file() {
                yylineno - file_info.real_line_start +
                    file_info.file_line_start);
         switch (t) {
-        case TOKEOF:
-            printf("TOKEOF\n");
-            break;
         case IDENT:
-            printf("IDENT (%s)\n", yylval.value.str);
+            printf("IDENT (%s)\n", yylval.str.str);
             break;
         case CHARLIT:
-            printf("CHARLIT %c(%d) %d\n", yylval.value.chr,
-                   (int)yylval.value.chr, yylval.type);
+            printf("CHARLIT %c(%d) %d\n", yylval.num.val.chr,
+                   (int)yylval.num.val.chr, yylval.num.type);
             break;
         case STRING:
-            printf("STRING %s %d %d\n", yylval.value.str, yylval.type,
-                   yylval.str_len);
+            printf("STRING %s %d %d\n", yylval.str.str, yylval.str.type,
+                   yylval.str.str_len);
             break;
         case NUMBER: {
-            if (yylval.type > 5) {
-                printf("NUMBER %Lg %d\n", yylval.value.flt, yylval.type);
+            if (yylval.num.type > 5) {
+                printf("NUMBER %Lg %d\n", yylval.num.val.flt, yylval.num.type);
                 break;
             }
-            printf("NUMBER %lld %d\n", yylval.value.u_int, yylval.type);
+            printf("NUMBER %lld %d\n", yylval.num.val.u_int, yylval.num.type);
             break;
         }
 

@@ -1,4 +1,5 @@
 #include "./lexer_util.h"
+#include "../parser.tab.h"
 #include <ctype.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -14,13 +15,13 @@ void get_file_info(char *file_info_str, int length, FileInfo *file_info) {
     file_info->file_line_start--;
 }
 
-YYLVALTYPE convert_to_ident(char *ident, int len) {
-    YYLVALTYPE ret;
-    ret.value.str = strndup(ident, len);
+YYSTYPE convert_to_ident(char *ident, int len) {
+    YYSTYPE ret;
+    ret.str.str = strndup(ident, len);
     return ret;
 }
 
-YYLVALTYPE convert_to_str(char *character, int len) {
+YYSTYPE convert_to_str(char *character, int len) {
     int has_prefix = character[0] != '"';
     int prefix_count = has_prefix + has_prefix * (character[1] == '8');
 
@@ -83,22 +84,22 @@ YYLVALTYPE convert_to_str(char *character, int len) {
     }
     char *final_str = (char *)malloc(true_str_len * sizeof(char));
     strncpy(final_str, post_str, true_str_len);
-    YYNVal num;
+    StrVal num;
     num.str = final_str;
-    YYLVALTYPE r_val;
-    r_val.value = num;
-    r_val.type = Tu8;
-    r_val.str_len = true_str_len;
+    num.str_len = true_str_len;
+    num.type = Tu8;
+    YYSTYPE r_val;
+    r_val.str = num;
     if (prefix_count == 1) {
         switch (character[0]) {
         case 'u':
-            r_val.type = Tu;
+            r_val.str.type = Tu;
             break;
         case 'U':
-            r_val.type = TU;
+            r_val.str.type = TU;
             break;
         case 'L':
-            r_val.type = TL;
+            r_val.str.type = TL;
             break;
         default:
             exit(1);
@@ -147,7 +148,7 @@ char convert_to_escaped(char escaped_char) {
     return val;
 }
 
-YYLVALTYPE convert_to_char(char *character, int len) {
+YYSTYPE convert_to_char(char *character, int len) {
     char prefix = character[0];
     int has_prefix = prefix != '\'';
     char val;
@@ -165,29 +166,29 @@ YYLVALTYPE convert_to_char(char *character, int len) {
         }
     }
 
-    YYNVal num;
-    num.chr = val;
-    YYLVALTYPE r_val;
-    r_val.value = num;
+    NumVal num;
+    num.val.chr = val;
+    YYSTYPE r_val;
+    r_val.num = num;
 
     switch (prefix) {
     case 'L':
-        r_val.type = TWCHAR;
+        r_val.num.type = TWCHAR;
         break;
     case 'U':
-        r_val.type = TCHAR32;
+        r_val.num.type = TCHAR32;
         break;
     case 'u':
-        r_val.type = TCHAR16;
+        r_val.num.type = TCHAR16;
         break;
     default:
-        r_val.type = TUCHAR;
+        r_val.num.type = TUCHAR;
         break;
     }
     return r_val;
 }
 
-YYLVALTYPE convert_to_float(char *number, int len, int base) {
+YYSTYPE convert_to_float(char *number, int len, int base) {
     char last = number[len - 1];
     char *format_string = "%LF%*s";
     if (base == 16) {
@@ -195,16 +196,16 @@ YYLVALTYPE convert_to_float(char *number, int len, int base) {
     }
     long double val;
     sscanf(number, format_string, &val);
-    YYNVal num;
-    num.flt = val;
-    YYLVALTYPE r_val;
-    r_val.value = num;
-    r_val.type = TDOUBLE + (last == 'f') + (last == 'F') +
-                 2 * ((last == 'L') + (last == 'l'));
+    NumVal num;
+    num.val.flt = val;
+    YYSTYPE r_val;
+    r_val.num = num;
+    r_val.num.type = TDOUBLE + (last == 'f') + (last == 'F') +
+                     2 * ((last == 'L') + (last == 'l'));
     return r_val;
 }
 
-YYLVALTYPE convert_to_int(char *number, int len, int base) {
+YYSTYPE convert_to_int(char *number, int len, int base) {
     unsigned long long val;
     char *format_string = "%llu%*s";
     // What is the base we are converting
@@ -212,11 +213,11 @@ YYLVALTYPE convert_to_int(char *number, int len, int base) {
         format_string = "0x%llx%*s";
     } else if (base == 8) {
         if (len == 1) {
-            YYNVal num;
-            num.u_int = 0;
-            YYLVALTYPE r_val;
-            r_val.value = num;
-            r_val.type = TINT;
+            NumVal num;
+            num.val.u_int = 0;
+            YYSTYPE r_val;
+            r_val.num = num;
+            r_val.num.type = TINT;
             return r_val;
         }
         format_string = "0%llo%*s";
@@ -249,27 +250,28 @@ YYLVALTYPE convert_to_int(char *number, int len, int base) {
 
     // stores the number
     sscanf(number, format_string, &val);
-    YYNVal num;
-    num.u_int = val;
-    YYLVALTYPE r_val;
-    r_val.value = num;
+    NumVal num;
+    num.val.u_int = val;
+    YYSTYPE r_val;
+    r_val.num = num;
 
     // gets the inital type
-    r_val.type = TINT + (is_unsigned * 3) + (i - start_suffix - is_unsigned);
+    r_val.num.type =
+        TINT + (is_unsigned * 3) + (i - start_suffix - is_unsigned);
 
     // checks to make sure it fits
-    switch (r_val.type) {
+    switch (r_val.num.type) {
     case TINT: {
         if ((int)val == val) {
             break;
         }
-        r_val.type = TLONG;
+        r_val.num.type = TLONG;
     }
     case TLONG: {
         if ((long)val == val) {
             break;
         }
-        r_val.type = TLONGLONG;
+        r_val.num.type = TLONGLONG;
     }
     case TLONGLONG: {
         if ((long long)val == val) {
@@ -282,13 +284,13 @@ YYLVALTYPE convert_to_int(char *number, int len, int base) {
         if ((unsigned int)val == val) {
             break;
         }
-        r_val.type = TULONG;
+        r_val.num.type = TULONG;
     }
     case TULONG: {
         if ((unsigned long)val == val) {
             break;
         }
-        r_val.type = TULONGLONG;
+        r_val.num.type = TULONGLONG;
     }
     case TULONGLONG: {
         if ((unsigned long long)val == val) {
