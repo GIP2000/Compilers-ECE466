@@ -4,6 +4,9 @@
 #include "./lexer/lexer_util.h"
 #include "./parser.tab.h"
 FileInfo file_info;
+void yyerror(char const *s) {
+    fprintf(stderr, "%s:%d: %s\n", file_info.file_name,yylineno - file_info.real_line_start + file_info.file_line_start, s);
+}
 %}
 %%
 #\ [0-9]+\ \".+\"(\ [0-9]+)* {file_info.real_line_start = yylineno;get_file_info(yytext, yyleng, &file_info); return LN;}
@@ -24,7 +27,7 @@ for {return FOR;}
 goto {return GOTO;}
 if {return IF;}
 inline {return INLINE;}
-int {return INT;}
+int {printf("I found an int\n");return INT;}
 long {return LONG;}
 register {return REGISTER;}
 restrict {return RESTRICT;}
@@ -51,7 +54,7 @@ _Imaginary {return _IMAGINARY;}
 _Noreturn {return _NORETURN;}
 _Static_assert {return _STATIC_ASSERT;}
 _Thread_local {return _THREAD_LOCAL;}
-[A-Za-z_][A-Za-z_0-9]* {yylval = convert_to_ident(yytext, yyleng);return IDENT;}
+[A-Za-z_][A-Za-z_0-9]* {printf("I found an ident\n");yylval = convert_to_ident(yytext, yyleng);return IDENT;}
 0[0-7]*([uU][lL][lL]|[uU][lL]?|[lL][uU]?|[lL][lL][uU]?)? {yylval = convert_to_int(yytext, yyleng, 8);return NUMBER;}
 [1-9][0-9]*([uU][lL][lL]|[uU][lL]?|[lL][uU]?|[lL][lL][uU]?)? {yylval = convert_to_int(yytext, yyleng, 10);return NUMBER;}
 0x[0-9A-Fa-f]+([uU][lL][lL]|[uU][lL]?|[lL][uU]?|[lL][lL][uU]?)? {yylval = convert_to_int(yytext, yyleng, 16);return NUMBER;}
