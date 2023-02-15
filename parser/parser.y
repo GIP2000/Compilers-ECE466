@@ -84,7 +84,13 @@
 
 %%
 
+
 start: translation_unit ;
+
+/* start: expression_list; */
+/* expression_list: expression */
+/*                | expression_list ',' expression */
+/*                ; */
 
 // 6.4.4
 constant: NUMBER
@@ -114,7 +120,7 @@ generic_association: type_name ':' assignment_expression
                    ;
 // 6.5.2
 postfix_expression: primary_expression
-                  | postfix_expression '[' expression ']'
+                  /* | postfix_expression '[' expression ']' */
                   | postfix_expression '(' argument_expression_list ')' // Optional
                   | postfix_expression '('')'
                   | postfix_expression  '.' IDENT

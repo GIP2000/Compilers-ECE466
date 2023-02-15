@@ -28,5 +28,5 @@ lex_test.out: lex.o lexer_util.o lex_test.o
 	gcc lex.o lexer_util.o lex_test.o -o lex_test.out
 
 clean:
-	rm -f lex.yy.c lex.h parser.tab.* *.o *.out gip
+	rm -f lex.yy.c lex.h parser.tab.* *.o *.out parser.output gip
 
