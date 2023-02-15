@@ -54,3 +54,4 @@ dkms.conf
 lex.yy.c
 parser.tab.c
 parser.tab.h
+gip
