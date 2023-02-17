@@ -38,6 +38,15 @@ AstNode *make_ternary_op(AstNode *cond, AstNode *truthy, AstNode *falsey) {
     return ast;
 }
 
+// struct AstNodeListNode *consume_and_next(struct AstNodeListNode *node) {
+//     if (node == NULL) {
+//         return NULL;
+//     }
+//     struct AstNodeListNode *next = node->next;
+//     free(node);
+//     return next;
+// }
+
 AstNode *make_func_call(AstNode *name, struct AstNodeListNode *arguments) {
     AstNode *ast = make_AstNode(ASTNODE_FUNCCALL);
     ast->func_call.name = name;
@@ -46,10 +55,18 @@ AstNode *make_func_call(AstNode *name, struct AstNodeListNode *arguments) {
         return ast;
     }
     // TODO reverse the linked list
-    struct AstNodeListNode *tail = arguments;
+    struct AstNodeListNode *prev = NULL;
+    struct AstNodeListNode *next = NULL;
+    struct AstNodeListNode *current;
     int i;
-    for (i = 1; tail != NULL; ++i, tail = tail->next) {
+    for (i = 0, current = arguments; current != NULL; ++i, current = next) {
+        next = current->next;
+        current->next = prev;
+        prev = current;
     }
+    ast->func_call.arguments = *prev;
+    free(prev);
+
     ast->func_call.argument_count = i;
 
     return ast;
