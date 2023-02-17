@@ -84,7 +84,7 @@ YYSTYPE convert_to_str(char *character, int len) {
     }
     char *final_str = (char *)malloc(true_str_len * sizeof(char));
     strncpy(final_str, post_str, true_str_len);
-    StrLit num;
+    YYlvalStrLit num;
     num.str = final_str;
     num.str_len = true_str_len;
     num.type = Tu8;
@@ -148,7 +148,7 @@ char convert_to_escaped(char escaped_char) {
     return val;
 }
 
-YYSTYPE convert_to_char(char *character, int len) {
+YYSTYPE convert_to_char(char *character) {
     char prefix = character[0];
     int has_prefix = prefix != '\'';
     char val;
@@ -161,12 +161,12 @@ YYSTYPE convert_to_char(char *character, int len) {
             if (character[has_prefix + 2] == 'x')
                 format_string = "'\\x%x'";
             int c_code;
-            sscanf(character + has_prefix, "'\\x%x'", &c_code);
+            sscanf(character + has_prefix, format_string, &c_code);
             val = c_code;
         }
     }
 
-    NumLit num;
+    YYlvalNumLit num;
     num.val.chr = val;
     YYSTYPE r_val;
     r_val.num = num;
@@ -196,7 +196,7 @@ YYSTYPE convert_to_float(char *number, int len, int base) {
     }
     long double val;
     sscanf(number, format_string, &val);
-    NumLit num;
+    YYlvalNumLit num;
     num.val.flt = val;
     YYSTYPE r_val;
     r_val.num = num;
@@ -213,7 +213,7 @@ YYSTYPE convert_to_int(char *number, int len, int base) {
         format_string = "0x%llx%*s";
     } else if (base == 8) {
         if (len == 1) {
-            NumLit num;
+            YYlvalNumLit num;
             num.val.u_int = 0;
             YYSTYPE r_val;
             r_val.num = num;
@@ -250,7 +250,7 @@ YYSTYPE convert_to_int(char *number, int len, int base) {
 
     // stores the number
     sscanf(number, format_string, &val);
-    NumLit num;
+    YYlvalNumLit num;
     num.val.u_int = val;
     YYSTYPE r_val;
     r_val.num = num;
@@ -262,38 +262,38 @@ YYSTYPE convert_to_int(char *number, int len, int base) {
     // checks to make sure it fits
     switch (r_val.num.type) {
     case TINT: {
-        if ((int)val == val) {
+        if ((int)val == (long long)val) {
             break;
         }
         r_val.num.type = TLONG;
     }
     case TLONG: {
-        if ((long)val == val) {
+        if ((long)val == (long long)val) {
             break;
         }
         r_val.num.type = TLONGLONG;
     }
     case TLONGLONG: {
-        if ((long long)val == val) {
+        if ((long long)val == (long long)val) {
             break;
         }
         // Ask what to do here
         break;
     }
     case TUINT: {
-        if ((unsigned int)val == val) {
+        if ((unsigned int)val == (unsigned long long)val) {
             break;
         }
         r_val.num.type = TULONG;
     }
     case TULONG: {
-        if ((unsigned long)val == val) {
+        if ((unsigned long)val == (unsigned long long)val) {
             break;
         }
         r_val.num.type = TULONGLONG;
     }
     case TULONGLONG: {
-        if ((unsigned long long)val == val) {
+        if ((unsigned long long)val == (unsigned long long)val) {
             break;
         }
         // Ask what to do here

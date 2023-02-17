@@ -20,11 +20,10 @@ typedef enum {
 } ConstantTypes;
 
 typedef struct {
-    int nodetype;
     char *str;
     ConstantTypes type;
     int str_len;
-} StrLit;
+} YYlvalStrLit;
 
 typedef union {
     unsigned long long u_int;
@@ -33,7 +32,6 @@ typedef union {
 } NVal;
 
 typedef struct {
-    int nodetype;
     NVal val;
     ConstantTypes type;
-} NumLit;
+} YYlvalNumLit;

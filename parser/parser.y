@@ -1,11 +1,18 @@
 %code requires {
     #include "./parser/yylval_types.h"
+    #include "./parser/ast.h"
+    #include <stdlib.h>
+    #include <stdio.h>
     int yylex();
     void yyerror(const char *s);
 }
 %union{
-    NumLit num;
-    StrLit str;
+    YYlvalNumLit num;
+    YYlvalStrLit str;
+    int op;
+    struct AstNodeListNode* arg_expression_list;
+    AstNode * astnode;
+
 }
 
 %token IDENT
@@ -81,155 +88,274 @@
 %token _THREAD_LOCAL
 %token LN
 
-%start translation_unit
+// types
+%type <astnode> IDENT constant primary_expression expression postfix_expression unary_expression cast_expression multiplicative_expression additive_expression shift_expression relational_expression equality_expression and_expression exclusive_or_expression inclusive_or_expression logical_and_expression logical_or_expression conditional_expression assignment_expression
+
+%type <op> unary_operator assignment_operator
+%type <arg_expression_list> argument_expression_list
+%type <num> NUMBER
+%type <str> STRING
+%type <num> CHARLIT
+
+
+%start expression_list
+//%start translation_unit
 %%
 
+// Notes:
+// Temporary start for assignemnt one
+// This causes a bunch of unused errors for the grammer
+// I am ignoring this until the next assignemnt when I need to implement them
+// The conflict that I have's default resolution is correct so I will not fix it
+expression_list: expression {
+                    print_AstNode($1, 0);
+               }
+              | expression_list ';' expression {
+                    print_AstNode($3, 0);
+              }
+              ;
+
 // 6.4.4
-constant: NUMBER
-        | CHARLIT
+constant: NUMBER {$$ = make_AstNode(ASTNODE_CONSTANT); AstNode * n = $$; n->constant = $1;}
+        | CHARLIT {$$ = make_AstNode(ASTNODE_CONSTANT); AstNode * n = $$; n->constant = $1;}
         ;
 
 // 6.5.1
-primary_expression: IDENT
+primary_expression: IDENT {
+                  $$ = make_IdentNode($<str>1);
+                  }// More work needed to figure out what its value is (if its an enum ... ) scoping and all that jazz
                   | constant
-                  | STRING
-                  | '(' expression ')'
-                  | generic_selection
+                  | STRING {
+                    $$ = make_AstNode(ASTNODE_STRLIT);
+                    AstNode * n = $$;
+                    n->strlit = $1;
+                  }
+                  | '(' expression ')' {$$ = $2;}
+                  | generic_selection {yyerror("Not Implemented"); exit(1);}
                   ;
 // 6.5.1.1
-generic_selection: _GENERIC '(' assignment_expression ',' generic_assoc_list ')';
-generic_assoc_list: generic_association
-                  | generic_assoc_list ',' generic_association
+generic_selection: _GENERIC '(' assignment_expression ',' generic_assoc_list ')' {yyerror("Not Implemented"); exit(1);};
+generic_assoc_list: generic_association {yyerror("Not Implemented"); exit(1);}
+                  | generic_assoc_list ',' generic_association {yyerror("Not Implemented"); exit(1);}
                   ;
-generic_association: type_name ':' assignment_expression
-                   | DEFAULT ':' assignment_expression
+generic_association: type_name ':' assignment_expression {yyerror("Not Implemented"); exit(1);}
+                   | DEFAULT ':' assignment_expression {yyerror("Not Implemented"); exit(1);}
                    ;
 // 6.5.2
 postfix_expression: primary_expression
-                  /* | postfix_expression '[' expression ']' */
-                  | postfix_expression '(' argument_expression_list ')' // Optional
-                  | postfix_expression '('')'
-                  | postfix_expression  '.' IDENT
-                  | postfix_expression  INDSEL IDENT
-                  | postfix_expression  PLUSPLUS IDENT
-                  | postfix_expression  MINUSMINUS IDENT
-                  | '(' type_name ')' '{' initalizer_list '}'
-                  | '(' type_name ')' '{' initalizer_list ',' '}'
+                  | postfix_expression '[' expression ']' {
+                      $$ = make_unary_op('*', make_binary_op('+', $1, $3));
+                  }
+                  | postfix_expression '(' argument_expression_list ')'  {
+                      $$ = make_func_call($1, $3);
+                  }// Optional
+                  | postfix_expression '('')' {
+                      $$ = make_func_call($1, NULL);
+                  }
+                  | postfix_expression  '.' IDENT {
+                      $$ = make_binary_op('.', $1, $3);
+                  }
+                  | postfix_expression INDSEL IDENT {
+                    AstNode * deref = make_unary_op('*', $1);
+                    AstNode * ident = make_IdentNode($<str>3);
+                    $$ = make_binary_op('.', deref, ident);
+                  }
+                  | postfix_expression PLUSPLUS {
+                      $$ = make_unary_op(PLUSPLUS, $1);
+                  }
+                  | postfix_expression  MINUSMINUS {
+                      $$ = make_unary_op(MINUSMINUS, $1);
+                  }
+                  | '(' type_name ')' '{' initalizer_list '}' {
+                    yyerror("UNIMPLEMNTED");
+                    exit(1);
+                }// TODO IMPLEMENT
+                  | '(' type_name ')' '{' initalizer_list ',' '}' {
+                    yyerror("UNIMPLEMNTED");
+                    exit(1);
+                }// TODO IMPLEMENT
                   ;
 
-argument_expression_list: assignment_expression
-                        | argument_expression_list ',' assignment_expression
-                        ;
+argument_expression_list: assignment_expression {
+                    $$ = make_node_list_node($1);
+                }
+                | argument_expression_list ',' assignment_expression{
+                    append_AstNodeListNode($1, $3);
+                    $$ = $1;
+                }
+                ;
 // 6.5.3
 unary_expression: postfix_expression
-                | PLUSPLUS unary_expression
-                | MINUSMINUS unary_expression
-                | unary_operator cast_expression
-                | SIZEOF unary_expression
-                | SIZEOF '(' type_name ')'
-                | _ALIGNOF '(' type_name ')'
+                | PLUSPLUS unary_expression {
+                    $$ = make_unary_op(PLUSPLUS, $2);
+                }
+                | MINUSMINUS unary_expression {
+                    $$ = make_unary_op(MINUSMINUS, $2);
+                }
+                | unary_operator cast_expression {
+                    $$ = make_unary_op($1, $2);
+                }
+                | SIZEOF unary_expression {
+                    $$ = make_unary_op(SIZEOF, $2);
+                }
+                | SIZEOF '(' type_name ')' {
+                    yyerror("UNIMPLEMNTED");
+                    exit(1);
+                }
+
+                | _ALIGNOF '(' type_name ')' {
+                    yyerror("UNIMPLEMNTED");
+                    exit(1);
+                }
                 ;
 
-unary_operator: '&'
-              | '*'
-              | '+'
-              | '-'
-              | '~'
-              | '!'
+unary_operator: '&' {$$ = '&';}
+              | '*' {$$ = '*';}
+              | '+' {$$ = '+';}
+              | '-' {$$ = '-';}
+              | '~' {$$ = '~';}
+              | '!' {$$ = '!';}
               ;
 
 // 6.5.4
 cast_expression: unary_expression
-               | '(' type_name ')' cast_expression
+               | '(' type_name ')' cast_expression{
+                    yyerror("UNIMPLEMNTED");
+                    exit(1);
+                }
                ;
 
 // 6.5.5
 multiplicative_expression: cast_expression
-                         | multiplicative_expression '*' cast_expression
-                         | multiplicative_expression '/' cast_expression
-                         | multiplicative_expression '%' cast_expression
+                         | multiplicative_expression '*' cast_expression {
+                            $$ = make_binary_op('*', $1, $3);
+                         }
+                         | multiplicative_expression '/' cast_expression{
+                            $$ = make_binary_op('/', $1, $3);
+                         }
+                         | multiplicative_expression '%' cast_expression{
+                            $$ = make_binary_op('%', $1, $3);
+                         }
                          ;
 
 
 // 6.5.6
 additive_expression: multiplicative_expression
-                   | additive_expression '+' multiplicative_expression
-                   | additive_expression '-' multiplicative_expression
+                   | additive_expression '+' multiplicative_expression {
+                       $$ = make_binary_op('+', $1, $3);
+                   }
+                   | additive_expression '-' multiplicative_expression{
+                       $$ = make_binary_op('-', $1, $3);
+                   }
                    ;
 
 
 // 6.5.7
 shift_expression: additive_expression
-                | shift_expression SHL additive_expression
-                | shift_expression SHR additive_expression
+                | shift_expression SHL additive_expression{
+                       $$ = make_binary_op(SHL, $1, $3);
+                   }
+                | shift_expression SHR additive_expression{
+                       $$ = make_binary_op(SHR, $1, $3);
+                   }
                 ;
 
 
 // 6.5.8
 relational_expression: shift_expression
-                     | relational_expression '<' shift_expression
-                     | relational_expression '>' shift_expression
-                     | relational_expression LTEQ shift_expression
-                     | relational_expression GTEQ shift_expression
+                     | relational_expression '<' shift_expression{
+                       $$ = make_binary_op('<', $1, $3);
+                   }
+                     | relational_expression '>' shift_expression{
+                       $$ = make_binary_op('>', $1, $3);
+                   }
+                     | relational_expression LTEQ shift_expression{
+                       $$ = make_binary_op(LTEQ, $1, $3);
+                   }
+                     | relational_expression GTEQ shift_expression{
+                       $$ = make_binary_op(GTEQ, $1, $3);
+                   }
                      ;
 
 // 6.5.9
 equality_expression: relational_expression
-                   | equality_expression EQEQ relational_expression
-                   | equality_expression NOTEQ relational_expression
+                   | equality_expression EQEQ relational_expression {
+                       $$ = make_binary_op(EQEQ, $1, $3);
+                   }
+                   | equality_expression NOTEQ relational_expression{
+                       $$ = make_binary_op(NOTEQ, $1, $3);
+                   }
                    ;
 
 // 6.5.10
 and_expression: equality_expression
-              | and_expression '&' equality_expression
+              | and_expression '&' equality_expression {
+                   $$ = make_binary_op('&', $1, $3);
+              }
               ;
 
 // 6.5.11
 exclusive_or_expression: and_expression
-                       | exclusive_or_expression '^' and_expression
+                       | exclusive_or_expression '^' and_expression{
+                           $$ = make_binary_op('^', $1, $3);
+                      }
                        ;
 
 // 6.5.12
 inclusive_or_expression: exclusive_or_expression
-                       | inclusive_or_expression '|' exclusive_or_expression
+                       | inclusive_or_expression '|' exclusive_or_expression {
+                           $$ = make_binary_op('|', $1, $3);
+                       }
                        ;
 
 // 6.5.13
 logical_and_expression: inclusive_or_expression
-                      | logical_and_expression LOGAND inclusive_or_expression
+                      | logical_and_expression LOGAND inclusive_or_expression {
+                           $$ = make_binary_op(LOGAND, $1, $3);
+                      }
                       ;
 
 // 6.5.14
 logical_or_expression: logical_and_expression
-                     | logical_or_expression LOGOR logical_and_expression
+                     | logical_or_expression LOGOR logical_and_expression {
+                           $$ = make_binary_op(LOGOR, $1, $3);
+                     }
                      ;
 
 // 6.5.15
 conditional_expression: logical_or_expression
-                      | logical_or_expression '?' expression ':' conditional_expression
+                      | logical_or_expression '?' expression ':' conditional_expression{
+                        $$ = make_ternary_op($1, $3, $5);
+                      }
                       ;
 
 
 // 6.5.16
 assignment_expression: conditional_expression
-                     | unary_expression assignment_operator assignment_expression
+                     | unary_expression assignment_operator assignment_expression {
+                        $$ = make_binary_op($2, $1, $3);
+                     }
                      ;
-assignment_operator: '='
-                   | TIMESEQ
-                   | DIVEQ
-                   | MODEQ
-                   | PLUSEQ
-                   | MINUSEQ
-                   | SHLEQ
-                   | SHREQ
-                   | ANDEQ
-                   | XOREQ
-                   | OREQ
+assignment_operator: '=' {$$ = '=';}
+                   | TIMESEQ {$$ = TIMESEQ;}
+                   | DIVEQ {$$ = DIVEQ;}
+                   | MODEQ {$$ = MODEQ;}
+                   | PLUSEQ {$$ = PLUSEQ;}
+                   | MINUSEQ {$$ = MINUSEQ;}
+                   | SHLEQ {$$ = SHLEQ;}
+                   | SHREQ {$$ = SHREQ;}
+                   | ANDEQ {$$ = ANDEQ;}
+                   | XOREQ {$$ = XOREQ;}
+                   | OREQ {$$ = OREQ;}
                    ;
 
 // 6.5.17
-expression: assignment_expression
-          | expression ',' assignment_expression
+expression: assignment_expression {
+            $$ = $1;
+          }
+          | expression ',' assignment_expression {
+            $$ = make_binary_op(',', $1, $3);
+          }
           ;
 
 // 6.6
