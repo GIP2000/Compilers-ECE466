@@ -24,7 +24,7 @@ typedef struct {
     char *str;
     ConstantTypes type;
     int str_len;
-} AstNodeStrLit;
+} StrLit;
 
 typedef union {
     unsigned long long u_int;
@@ -36,4 +36,4 @@ typedef struct {
     int nodetype;
     NVal val;
     ConstantTypes type;
-} AstNodeNumLit;
+} NumLit;

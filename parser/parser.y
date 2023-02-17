@@ -1,14 +1,15 @@
 %code requires {
+    #include "./parser/yylval_types.h"
     int yylex();
     void yyerror(const char *s);
-    #include "./parser/yylval_types.h"
 }
 %union{
-    struct AstNodeGeneric {int nodetype;} generic;
-    AstNodeNumLit num;
-    AstNodeStrLit str;
+    NumLit num;
+    StrLit str;
 }
+
 %token IDENT
+%token TYPEDEF_NAME
 %token CHARLIT
 %token STRING
 %token NUMBER
@@ -80,28 +81,13 @@
 %token _THREAD_LOCAL
 %token LN
 
-
-
+%start translation_unit
 %%
-
-
-start: translation_unit ;
-
-/* start: expression_list; */
-/* expression_list: expression */
-/*                | expression_list ',' expression */
-/*                ; */
 
 // 6.4.4
 constant: NUMBER
-        | enumeration_constant
         | CHARLIT
         ;
-
-
-// 6.4.4.3
-enumeration_constant: IDENT;
-
 
 // 6.5.1
 primary_expression: IDENT
@@ -298,7 +284,7 @@ type_specifier: VOID
               | atomic_type_specifier
               | struct_or_union_specifier
               | enum_specifier
-              | typedef_name
+              | TYPEDEF_NAME
               ;
 
 // 6.7.2.1
@@ -325,7 +311,7 @@ specifier_qualifer_list: type_specifier specifier_qualifer_list // Optional
                        | type_qualifier // Optional
                        ;
 
-struct_declarator_list: struct_declarator_list
+struct_declarator_list: struct_declarator
                       | struct_declarator_list ',' struct_declarator
                       ;
 
@@ -345,8 +331,8 @@ enum_specifier: ENUM IDENT '{' enumerator_list '}' // Optional
 enumerator_list: enumerator
                | enumerator_list ',' enumerator
                ;
-enumerator: enumeration_constant
-          | enumeration_constant '=' constant_expression
+enumerator: IDENT
+          | IDENT '=' constant_expression
           ;
 
 // 6.7.2.3 Come back to tags didn't see any grammer things
@@ -453,7 +439,7 @@ direct_abstract_declarator: '(' abstract_declarator ')'
                           ;
 
 // 6.7.8
-typedef_name: IDENT ;
+/* typedef_name: IDENT ; */
 
 // 6.7.9
 initalizer:  assignment_expression

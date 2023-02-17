@@ -84,7 +84,7 @@ YYSTYPE convert_to_str(char *character, int len) {
     }
     char *final_str = (char *)malloc(true_str_len * sizeof(char));
     strncpy(final_str, post_str, true_str_len);
-    AstNodeStrLit num;
+    StrLit num;
     num.str = final_str;
     num.str_len = true_str_len;
     num.type = Tu8;
@@ -166,7 +166,7 @@ YYSTYPE convert_to_char(char *character, int len) {
         }
     }
 
-    AstNodeNumLit num;
+    NumLit num;
     num.val.chr = val;
     YYSTYPE r_val;
     r_val.num = num;
@@ -196,7 +196,7 @@ YYSTYPE convert_to_float(char *number, int len, int base) {
     }
     long double val;
     sscanf(number, format_string, &val);
-    AstNodeNumLit num;
+    NumLit num;
     num.val.flt = val;
     YYSTYPE r_val;
     r_val.num = num;
@@ -213,7 +213,7 @@ YYSTYPE convert_to_int(char *number, int len, int base) {
         format_string = "0x%llx%*s";
     } else if (base == 8) {
         if (len == 1) {
-            AstNodeNumLit num;
+            NumLit num;
             num.val.u_int = 0;
             YYSTYPE r_val;
             r_val.num = num;
@@ -250,7 +250,7 @@ YYSTYPE convert_to_int(char *number, int len, int base) {
 
     // stores the number
     sscanf(number, format_string, &val);
-    AstNodeNumLit num;
+    NumLit num;
     num.val.u_int = val;
     YYSTYPE r_val;
     r_val.num = num;
