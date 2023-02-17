@@ -180,8 +180,7 @@ argument_expression_list: assignment_expression {
                     $$ = make_node_list_node($1);
                 }
                 | argument_expression_list ',' assignment_expression{
-                    append_AstNodeListNode($1, $3);
-                    $$ = $1;
+                    $$ = append_AstNodeListNode($1, $3);
                 }
                 ;
 // 6.5.3

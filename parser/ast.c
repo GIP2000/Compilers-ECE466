@@ -45,11 +45,10 @@ AstNode *make_func_call(AstNode *name, struct AstNodeListNode *arguments) {
         ast->func_call.argument_count = 0;
         return ast;
     }
-    ast->func_call.arguments = *arguments;
-    free(arguments);
-    struct AstNodeListNode *head = ast->func_call.arguments.next;
+    // TODO reverse the linked list
+    struct AstNodeListNode *tail = arguments;
     int i;
-    for (i = 2; head != NULL; ++i, head = head->next) {
+    for (i = 1; tail != NULL; ++i, tail = tail->next) {
     }
     ast->func_call.argument_count = i;
 
@@ -64,9 +63,11 @@ struct AstNodeListNode *make_node_list_node(AstNode *node) {
     return head;
 }
 
-void append_AstNodeListNode(struct AstNodeListNode *node, AstNode *next) {
-    // TODO make this actually append instead of limiting it to 2
-    node->next = make_node_list_node(next);
+struct AstNodeListNode *append_AstNodeListNode(struct AstNodeListNode *node,
+                                               AstNode *next) {
+    struct AstNodeListNode *head = make_node_list_node(next);
+    head->next = node;
+    return head;
 }
 
 void add_tab(unsigned int tab_count) {

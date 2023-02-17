@@ -57,7 +57,8 @@ AstNode *make_func_call(AstNode *name, struct AstNodeListNode *arguments);
 
 struct AstNodeListNode *make_node_list_node(AstNode *node);
 
-void append_AstNodeListNode(struct AstNodeListNode *, AstNode *next);
+struct AstNodeListNode *append_AstNodeListNode(struct AstNodeListNode *,
+                                               AstNode *next);
 
 AstNode *make_IdentNode(YYlvalStrLit val);
 
