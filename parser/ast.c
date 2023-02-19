@@ -1,6 +1,9 @@
 #include "./ast.h"
+#include "../parser.tab.h"
+#include <ctype.h>
 #include <stdio.h>
 #include <stdlib.h>
+#include <string.h>
 
 AstNode *make_AstNode(int type) {
     AstNode *node = (AstNode *)malloc(sizeof(AstNode));
@@ -77,6 +80,111 @@ struct AstNodeListNode *append_AstNodeListNode(struct AstNodeListNode *node,
     return head;
 }
 
+void get_op_str(char *out_str, int op) {
+    switch (op) {
+    case PLUSPLUS:
+        out_str[0] = '+';
+        out_str[1] = '+';
+        break;
+    case MINUSMINUS:
+        out_str[0] = '-';
+        out_str[1] = '-';
+        break;
+    case SHL:
+        out_str[0] = '<';
+        out_str[1] = '<';
+        break;
+    case SHR:
+        out_str[0] = '>';
+        out_str[1] = '>';
+        break;
+    case LTEQ:
+        out_str[0] = '<';
+        out_str[1] = '=';
+        break;
+    case GTEQ:
+        out_str[0] = '>';
+        out_str[1] = '=';
+        break;
+    case EQEQ:
+        out_str[0] = '=';
+        out_str[1] = '=';
+        break;
+    case NOTEQ:
+        out_str[0] = '!';
+        out_str[1] = '=';
+        break;
+    case LOGAND:
+        out_str[0] = '&';
+        out_str[1] = '&';
+        break;
+    case LOGOR:
+        out_str[0] = '|';
+        out_str[1] = '|';
+        break;
+    case ELLIPSIS:
+        out_str[0] = '.';
+        out_str[1] = '.';
+        out_str[2] = '.';
+        break;
+    case TIMESEQ:
+        out_str[0] = '*';
+        out_str[1] = '=';
+        break;
+    case DIVEQ:
+        out_str[0] = '/';
+        out_str[1] = '=';
+        break;
+    case MODEQ:
+        out_str[0] = '%';
+        out_str[1] = '=';
+        break;
+    case PLUSEQ:
+        out_str[0] = '+';
+        out_str[1] = '=';
+        break;
+    case MINUSEQ:
+        out_str[0] = '-';
+        out_str[1] = '=';
+        break;
+    case SHLEQ:
+        out_str[0] = '<';
+        out_str[1] = '<';
+        out_str[2] = '=';
+        break;
+    case SHREQ:
+        out_str[0] = '>';
+        out_str[1] = '>';
+        out_str[2] = '=';
+        break;
+    case ANDEQ:
+        out_str[0] = '&';
+        out_str[1] = '=';
+        break;
+    case OREQ:
+        out_str[0] = '|';
+        out_str[1] = '=';
+        break;
+    case XOREQ:
+        out_str[0] = '^';
+        out_str[1] = '=';
+        break;
+    case SIZEOF:
+        out_str[0] = 'S';
+        out_str[1] = 'Z';
+        out_str[2] = 'O';
+        break;
+    default: {
+        if (op == '!' || op == '%' || op == '&' || (op >= '*' && op <= '/') ||
+            (op >= '<' && op <= '>') || op == '^' || op == '~' || op == '|') {
+            out_str[0] = (char)op;
+        } else {
+            fprintf(stderr, "Invalid Operator");
+        }
+    }
+    }
+}
+
 void add_tab(unsigned int tab_count) {
     unsigned int i;
     for (i = 0; i < tab_count; ++i) {
@@ -112,13 +220,19 @@ void print_AstNode(AstNode *head, unsigned int tab_count) {
     case ASTNODE_IDENT:
         printf("IDENT %s\n", head->ident);
         return;
-    case ASTNODE_UNARYOP:
-        printf("UNARY OP%c(%d)\n", (char)head->unary_op.op, head->unary_op.op);
+    case ASTNODE_UNARYOP: {
+        char op[4] = {0, 0, 0, 0};
+        get_op_str(op, head->unary_op.op);
+        printf("Unary OP %s\n", op);
         return print_AstNode(head->unary_op.child, tab_count + 1);
-    case ASTNODE_BINARYOP:
-        printf("BINARY OP %c\n", (char)head->binary_op.op);
+    }
+    case ASTNODE_BINARYOP: {
+        char op[4] = {0, 0, 0, 0};
+        get_op_str(op, head->binary_op.op);
+        printf("BINARY OP %s\n", op);
         print_AstNode(head->binary_op.left, tab_count + 1);
         return print_AstNode(head->binary_op.right, tab_count + 1);
+    }
     case ASTNODE_TERNAYROP:
         printf("Ternary OP, IF\n");
         print_AstNode(head->ternary_op.cond, tab_count + 1);
@@ -142,7 +256,7 @@ void print_AstNode(AstNode *head, unsigned int tab_count) {
         return;
     }
     default:
-        fprintf(stderr, "Unsuportted Node type\n");
+        fprintf(stderr, "Unsuportted Node type %d\n", head->type);
         exit(1);
     }
 }

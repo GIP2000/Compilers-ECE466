@@ -107,6 +107,7 @@
 // This causes a bunch of unused errors for the grammer
 // I am ignoring this until the next assignemnt when I need to implement them
 // The conflict that I have's default resolution is correct so I will not fix it
+// Also Idents right now are very ugly but I don't want to fix them until I have to implement them fully
 expression_list: expression {
                     print_AstNode($1, 0);
                }
@@ -153,7 +154,7 @@ postfix_expression: primary_expression
                       $$ = make_func_call($1, NULL);
                   }
                   | postfix_expression  '.' IDENT {
-                      $$ = make_binary_op('.', $1, $3);
+                      $$ = make_binary_op('.', $1, make_IdentNode($<str>3));
                   }
                   | postfix_expression INDSEL IDENT {
                     AstNode * deref = make_unary_op('*', $1);
@@ -186,10 +187,24 @@ argument_expression_list: assignment_expression {
 // 6.5.3
 unary_expression: postfix_expression
                 | PLUSPLUS unary_expression {
-                    $$ = make_unary_op(PLUSPLUS, $2);
+                    AstNode * node  = make_AstNode(ASTNODE_CONSTANT);
+                    NVal n;
+                    n.u_int = 1;
+                    YYlvalNumLit nl;
+                    nl.type = TINT;
+                    nl.val = n;
+                    node->constant = nl;
+                    $$ = make_binary_op(PLUSEQ, $2, node);
                 }
                 | MINUSMINUS unary_expression {
-                    $$ = make_unary_op(MINUSMINUS, $2);
+                    AstNode * node  = make_AstNode(ASTNODE_CONSTANT);
+                    NVal n;
+                    n.u_int = 1;
+                    YYlvalNumLit nl;
+                    nl.type = TINT;
+                    nl.val = n;
+                    node->constant = nl;
+                    $$ = make_binary_op(MINUSEQ, $2, node);
                 }
                 | unary_operator cast_expression {
                     $$ = make_unary_op($1, $2);

@@ -64,7 +64,7 @@ _Thread_local {return _THREAD_LOCAL;}
 0x[A-Fa-f0-9]+[pP][+-]?[0-9]+[FfLl]? {yylval = convert_to_float(yytext, yyleng, 16);return NUMBER;}
 [LUu]?\'([^'\\\n]|(\\(['"?\\abfnrtv]|[0-7][0-7]?[0-7]?))|(\\x[0-9A-Fa-f]+))+' {yylval = convert_to_char(yytext);return CHARLIT;}
 (u8|u|U|L)?\"([^\"\\\n]|(\\(['"?\\abfnrtv]|[0-7][0-7]?[0-7]?))|(\\x[0-9A-Fa-f][0-9A-Fa-f]?))*\" {yylval = convert_to_str(yytext,yyleng); return STRING;}
-[\[\]\(\)\{\}\.\&\*\+~!\/%<>\^\|\?:;=,-] {return yytext[0];}
+[\[\]\(\)\{\}\.\&\*\+\~!\/%<>\^\|\?:;=,-] {return yytext[0];}
 -> {return INDSEL;}
 \+\+ {return PLUSPLUS;}
 -- {return MINUSMINUS;}
