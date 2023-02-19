@@ -1,10 +1,12 @@
 %option noyywrap
 %option yylineno
 %{
-#include "./lexer/token_codes.h"
 #include "./lexer/lexer_util.h"
-YYLVALTYPE yylval;
+#include "./parser.tab.h"
 FileInfo file_info;
+void yyerror(char const *s) {
+    fprintf(stderr, "%s:%d: %s\n", file_info.file_name,yylineno - file_info.real_line_start + file_info.file_line_start, s);
+}
 %}
 %%
 #\ [0-9]+\ \".+\"(\ [0-9]+)* {file_info.real_line_start = yylineno;get_file_info(yytext, yyleng, &file_info); return LN;}
@@ -60,9 +62,9 @@ _Thread_local {return _THREAD_LOCAL;}
 [0-9]+[eE][+-]?[0-9]+[FfLl]? {yylval = convert_to_float(yytext, yyleng, 10);return NUMBER;}
 0x[A-Fa-f0-9]*\.[A-Fa-f0-9]+[pP][+-]?[0-9]+[FfLl]? {yylval = convert_to_float(yytext, yyleng, 16);return NUMBER;}
 0x[A-Fa-f0-9]+[pP][+-]?[0-9]+[FfLl]? {yylval = convert_to_float(yytext, yyleng, 16);return NUMBER;}
-[LUu]?\'([^'\\\n]|(\\(['"?\\abfnrtv]|[0-7][0-7]?[0-7]?))|(\\x[0-9A-Fa-f]+))+' {yylval = convert_to_char(yytext, yyleng);return CHARLIT;}
+[LUu]?\'([^'\\\n]|(\\(['"?\\abfnrtv]|[0-7][0-7]?[0-7]?))|(\\x[0-9A-Fa-f]+))+' {yylval = convert_to_char(yytext);return CHARLIT;}
 (u8|u|U|L)?\"([^\"\\\n]|(\\(['"?\\abfnrtv]|[0-7][0-7]?[0-7]?))|(\\x[0-9A-Fa-f][0-9A-Fa-f]?))*\" {yylval = convert_to_str(yytext,yyleng); return STRING;}
-[\[\]\(\)\{\}\.\&\*\+~!\/%<>\^\|\?:;=,-] {return yytext[0];}
+[\[\]\(\)\{\}\.\&\*\+\~!\/%<>\^\|\?:;=,-] {return yytext[0];}
 -> {return INDSEL;}
 \+\+ {return PLUSPLUS;}
 -- {return MINUSMINUS;}
