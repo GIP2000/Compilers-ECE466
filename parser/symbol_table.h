@@ -1,10 +1,6 @@
 #pragma once
 #include <stdlib.h>
-enum IdentType {
-    VARIABLE,
-    FUNCTION,
-    TAG,
-};
+enum IdentType { VARIABLE, FUNCTION, TYPEDEFNAME, TAG, LABELNAME, MEMBER };
 
 enum StorageClass {
     S_EXTERN,
@@ -27,25 +23,14 @@ struct SymbolTable {
     struct SymbolTable *parent;
 };
 
-union SymbolVal {
-    struct {
-    } var;
-    struct {
-    } func;
-    struct {
-        struct SymbolTable mem;
-    } tag;
-    struct {
-    } label;
-    struct {
-    } typedef_name;
-};
-
 struct SymbolTableNode {
     char *name;
     enum Namespace namespc;
     enum IdentType type;
-    union SymbolVal val;
+    struct {
+        enum StorageClass sc;
+        struct Type *type;
+    } val;
 };
 
 struct SymbolTable *initalize_table(size_t capacity);
@@ -55,3 +40,5 @@ void create_namespace();
 int find_in_namespace(char *name, enum Namespace namespc);
 
 int enter_in_namespace(char *name, enum Namespace namespc);
+
+void pop_symbol_table();

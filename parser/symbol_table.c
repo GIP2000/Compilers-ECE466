@@ -1,4 +1,6 @@
 #include "./symbol_table.h"
+#include "./types.h"
+#include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 
@@ -13,6 +15,24 @@ struct SymbolTable *initalize_table(size_t capacity) {
         sizeof(struct SymbolTableNode) * capacity);
 
     return symbol_table;
+}
+
+void pop_symbol_table() {
+    if (symbol_table->parent == NULL) {
+        fprintf(stderr, "Tried to pop global symbol table");
+        exit(1);
+    }
+
+    size_t i;
+    for (i = 0; i < symbol_table->len; ++i) {
+        free(symbol_table->nodearr[i].name);
+        free_type(symbol_table->nodearr[i].val.type, 1);
+    }
+    free(symbol_table->nodearr);
+
+    struct SymbolTable *old = symbol_table;
+    symbol_table = symbol_table->parent;
+    free(old);
 }
 
 void create_namespace() {
