@@ -1,10 +1,12 @@
 %code requires {
     #include "./parser/yylval_types.h"
     #include "./parser/ast.h"
+    #include "./parser/symbol_table.h"
     #include <stdlib.h>
     #include <stdio.h>
     int yylex();
     void yyerror(const char *s);
+    extern struct SymbolTable * symbol_table;
 }
 %union{
     YYlvalNumLit num;

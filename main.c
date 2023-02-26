@@ -1,5 +1,7 @@
 #include "./parser.tab.h"
 #include "lexer/lexer_util.h"
+#include "parser.tab.h"
+#include "parser/symbol_table.h"
 #include <limits.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -7,7 +9,9 @@
 
 extern FileInfo file_info;
 FILE *yyin;
+struct SymbolTable *symbol_table;
 int main(int argc, char **argv) {
+    symbol_table = initalize_table(10);
     if (argc == 1) {
         file_info.file_line_start = 0;
         file_info.real_line_start = 0;

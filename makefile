@@ -15,6 +15,9 @@ lex.yy.c: lexer/lexer.l parser.tab.h
 lexer_util.o: lexer/lexer_util.c lexer/lexer_util.h
 	gcc $(FLAGS) -c lexer/lexer_util.c -o lexer_util.o
 
+symbol_table.o: parser/symbol_table.c parser/symbol_table.h
+	gcc $(FLAGS) -c parser/symbol_table.c -o symbol_table.o
+
 ast.o: parser/ast.c parser/ast.h
 	gcc $(FLAGS) -c parser/ast.c -o ast.o
 
@@ -26,8 +29,8 @@ lex_test.o: lexer/lexer_test.c
 main.o: main.c
 	gcc $(FLAGS) -c main.c -o main.o
 
-gip: lex.o ast.o lexer_util.o parser.tab.o main.o
-	gcc $(FLAGS) main.o lex.o lexer_util.o parser.tab.o ast.o -o gip
+gip: lex.o ast.o lexer_util.o parser.tab.o main.o symbol_table.o
+	gcc $(FLAGS) main.o lex.o lexer_util.o parser.tab.o ast.o symbol_table.o -o gip
 
 lex_test.out: lex.o lexer_util.o lex_test.o
 	gcc $(FLAGS) lex.o lexer_util.o lex_test.o -o lex_test.out
