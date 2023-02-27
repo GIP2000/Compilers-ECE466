@@ -2,6 +2,7 @@
     #include "./parser/yylval_types.h"
     #include "./parser/ast.h"
     #include "./parser/symbol_table.h"
+    #include "./parser/types.h"
     #include <stdlib.h>
     #include <stdio.h>
     int yylex();
@@ -14,7 +15,11 @@
     int op;
     struct AstNodeListNode* arg_expression_list;
     AstNode * astnode;
-
+    enum StorageClass storage_class;
+    struct SymbolTableNode current_symbol;
+    struct Type * type;
+    enum TypeQualifier type_qualifier;
+    enum FunctionSpecifier function_specifier;
 }
 
 %token IDENT
@@ -91,16 +96,24 @@
 %token LN
 
 // types
-%type <astnode> IDENT constant primary_expression expression postfix_expression unary_expression cast_expression multiplicative_expression additive_expression shift_expression relational_expression equality_expression and_expression exclusive_or_expression inclusive_or_expression logical_and_expression logical_or_expression conditional_expression assignment_expression
+%type <astnode> constant primary_expression expression postfix_expression unary_expression cast_expression multiplicative_expression additive_expression shift_expression relational_expression equality_expression and_expression exclusive_or_expression inclusive_or_expression logical_and_expression logical_or_expression conditional_expression assignment_expression
+
+%type <arg_expression_list> argument_expression_list
+%type <storage_class> storage_class_specifier
+%type <current_symbol> declaration_specifiers direct_declarator
+%type <type> type_specifier
+%type <type_qualifier> type_qualifier
+%type <function_specifier> function_specifier
+%type <IDENT> str
+
 
 %type <op> unary_operator assignment_operator
-%type <arg_expression_list> argument_expression_list
 %type <num> NUMBER
 %type <str> STRING
 %type <num> CHARLIT
 
 
-%start expression_list
+%start statment
 //%start translation_unit
 %%
 
@@ -110,13 +123,6 @@
 // I am ignoring this until the next assignemnt when I need to implement them
 // The conflict that I have's default resolution is correct so I will not fix it
 // Also Idents right now are very ugly but I don't want to fix them until I have to implement them fully
-expression_list: expression {
-                    print_AstNode($1, 0);
-               }
-              | expression_list ';' expression {
-                    print_AstNode($3, 0);
-              }
-              ;
 
 // 6.4.4
 constant: NUMBER {$$ = make_AstNode(ASTNODE_CONSTANT); AstNode * n = $$; n->constant = $1;}
@@ -125,7 +131,8 @@ constant: NUMBER {$$ = make_AstNode(ASTNODE_CONSTANT); AstNode * n = $$; n->cons
 
 // 6.5.1
 primary_expression: IDENT {
-                  $$ = make_IdentNode($<str>1);
+                  /* $$ = make_IdentNode($<str>1); */
+                  $$ = make_IdentNode($1);
                   }// More work needed to figure out what its value is (if its an enum ... ) scoping and all that jazz
                   | constant
                   | STRING {
@@ -156,11 +163,13 @@ postfix_expression: primary_expression
                       $$ = make_func_call($1, NULL);
                   }
                   | postfix_expression  '.' IDENT {
-                      $$ = make_binary_op('.', $1, make_IdentNode($<str>3));
+                      $$ = make_binary_op('.', $1, make_IdentNode($3));
+                      /* $$ = make_binary_op('.', $1, make_IdentNode($<str>3)); */
                   }
                   | postfix_expression INDSEL IDENT {
                     AstNode * deref = make_unary_op('*', $1);
-                    AstNode * ident = make_IdentNode($<str>3);
+                    AstNode * ident = make_IdentNode($3);
+                    /* AstNode * ident = make_IdentNode($<str>3); */
                     $$ = make_binary_op('.', deref, ident);
                   }
                   | postfix_expression PLUSPLUS {
@@ -383,16 +392,50 @@ declaration: declaration_specifiers init_declarator_list ';' // Optional
            | static_assert_decleration
            ;
 
-declaration_specifiers: storage_class_specifier declaration_specifiers // Optional
-                      | storage_class_specifier
-                      | type_specifier declaration_specifiers // Optional
-                      | type_specifier
-                      | type_qualifier declaration_specifiers // Optional
-                      | type_qualifier
-                      | function_specifier declaration_specifiers // Optional
-                      | function_specifier
-                      | alignment_specifier declaration_specifiers // Optional
-                      | alignment_specifier
+declaration_specifiers: storage_class_specifier declaration_specifiers {
+                          $2.val.sc = $1;
+                          $$ = $2;
+                      }// Optional
+                      | storage_class_specifier {
+                        struct SymbolTableNode n;
+                        n.val.sc = $1;
+                        $$ = n;
+                      }
+                      | type_specifier declaration_specifiers {
+                        add_or_throw_type($2.val.type, $1);
+                        $$ = $2;
+                      }// Optional
+                      | type_specifier {
+                        struct SymbolTableNode n;
+                        n.val.type = $1;
+                        $$ = n;
+                      }
+                      | type_qualifier declaration_specifiers {
+                        $2.val.qualifier_bit_mask |= $1;
+                        $$ = $2;
+                      }// Optional
+                      | type_qualifier {
+                        struct SymbolTableNode n;
+                        n.val.qualifier_bit_mask = $1;
+                        $$ = n;
+                      }
+                      | function_specifier declaration_specifiers  {
+                        $2.val.function_spec_bit_mask |= $1;
+                        $$ = $2;
+                      }// Optional
+                      | function_specifier{
+                        struct SymbolTableNode n;
+                        n.val.function_spec_bit_mask = $1;
+                        $$ = n;
+                      }
+                      | alignment_specifier declaration_specifiers {
+                          yyerror("UNIMPLEMNTED");
+                          exit(1);
+                      }// Optional
+                      | alignment_specifier{
+                          yyerror("UNIMPLEMNTED");
+                          exit(1);
+                      }
                       ;
 
 init_declarator_list: init_declarator
@@ -403,30 +446,54 @@ init_declarator: declarator
                | declarator '=' initalizer
                ;
 // 6.7.1
-storage_class_specifier: TYPEDEF
-                       | EXTERN
-                       | STATIC
-                       | _THREAD_LOCAL
-                       | AUTO
-                       | REGISTER
+storage_class_specifier: TYPEDEF {
+                        yyerror("UNIMPLEMNTED");
+                        exit(1);
+                       }
+                       | EXTERN {$$ = S_EXTERN;}
+                       | STATIC {$$ = S_STATIC;}
+                       | _THREAD_LOCAL {
+                            yyerror("UNIMPLEMNTED");
+                            exit(1);
+                       }
+                       | AUTO {$$ = S_AUTO;}
+                       | REGISTER {$$ = S_REG;}
                        ;
 
 // 6.7.2
-type_specifier: VOID
-              | CHAR
-              | SHORT
-              | INT
-              | LONG
-              | FLOAT
-              | DOUBLE
-              | SIGNED
-              | UNSIGNED
-              | _BOOL
-              | _COMPLEX
-              | atomic_type_specifier
-              | struct_or_union_specifier
-              | enum_specifier
-              | TYPEDEF_NAME
+type_specifier: VOID {$$ = make_default_type(T_VOID);}
+              | CHAR {$$ = make_default_type(T_CHAR);}
+              | SHORT {$$ = make_default_type(T_SHORT);}
+              | INT {$$ = make_default_type(T_INT);}
+              | LONG {$$ = make_next_type(T_LONG, NULL);}
+              | FLOAT {$$ = make_default_type(T_FLOAT);}
+              | DOUBLE{$$ = make_default_type(T_DOUBLE);}
+              | SIGNED  {$$ = make_next_type(T_SIGNED, NULL);}
+              | UNSIGNED {$$ = make_next_type(T_UNSIGNED, NULL);}
+              | _BOOL{
+                   yyerror("UNIMPLEMNTED");
+                   exit(1);
+              }
+              | _COMPLEX{
+                   yyerror("UNIMPLEMNTED");
+                   exit(1);
+              }
+              | atomic_type_specifier{
+                   yyerror("UNIMPLEMNTED");
+                   exit(1);
+              }
+              | struct_or_union_specifier{
+                   yyerror("UNIMPLEMNTED");
+                   exit(1);
+              }
+              | enum_specifier{
+                   yyerror("UNIMPLEMNTED");
+                   exit(1);
+              }
+              | TYPEDEF_NAME{
+                   yyerror("UNIMPLEMNTED");
+                   exit(1);
+              }
               ;
 
 // 6.7.2.1
@@ -483,20 +550,26 @@ enumerator: IDENT
 atomic_type_specifier: _ATOMIC '(' type_name ')';
 
 // 6.7.3
-type_qualifier: CONST
-              | RESTRICT
-              | VOLATILE
-              | _ATOMIC
+type_qualifier: CONST {$$ = Q_CONST;}
+              | RESTRICT {$$ = Q_RESTRICT;}
+              | VOLATILE {$$ = Q_VOLATILE;}
+              | _ATOMIC {$$ = Q__ATOMIC;}
               ;
 
 // 6.7.4
-function_specifier: INLINE
-                  | _NORETURN
+function_specifier: INLINE {$$ = F_INLINE;}
+                  | _NORETURN {$$ = F__NORETURN;}
                   ;
 
 // 6.7.5
-alignment_specifier: _ALIGNAS '(' type_name ')'
-                   | _ALIGNAS '(' constant_expression ')'
+alignment_specifier: _ALIGNAS '(' type_name ')' {
+                        yyerror("UNIMPLEMNTED");
+                        exit(1);
+                   }
+                   | _ALIGNAS '(' constant_expression ')'{
+                        yyerror("UNIMPLEMNTED");
+                        exit(1);
+                   }
                    ;
 
 // 6.7.6
@@ -504,13 +577,37 @@ declarator: pointer direct_declarator
           | direct_declarator
           ;
 
-direct_declarator: IDENT
-                 | '(' declarator ')'
-                 | direct_declarator '[' type_qualifier_list assignment_expression ']' // Double Optional
-                 | direct_declarator '['type_qualifier_list ']'
-                 | direct_declarator '[' assignment_expression ']'
-                 | direct_declarator '[' ']'
-                 | direct_declarator '[' STATIC type_qualifier_list assignment_expression']' // Optional
+direct_declarator: IDENT {
+                    struct SymbolTableNode n;
+                    n.name = $1;
+                    $$ = n;
+                 }
+                 | '(' declarator ')' {
+                    $$ = $2; // Double check I interpreted this correctly
+                 }
+                 | direct_declarator '[' type_qualifier_list assignment_expression ']' {
+                    $1.val.qualifier_bit_mask = $3;
+                    $1.val.type = make_next_type(T_ARR, NULL);
+                    $1.val.type->next_type.extentions.next_type.arr_size_expression = $4;
+                    $$ = $1;
+                 }// Double Optional
+                 | direct_declarator '['type_qualifier_list ']' {
+                    $1.val.qualifier_bit_mask = $3;
+                    $1.val.type = make_next_type(T_ARR, NULL);
+                    $$ = $1;
+                 }
+                 | direct_declarator '[' assignment_expression ']' {
+                    $1.val.type = make_next_type(T_ARR, NULL);
+                    $1.val.type->next_type.extentions.next_type.arr_size_expression = $3;
+                    $$ = $1;
+                 }
+                 | direct_declarator '[' ']' {
+                    $1.val.type = make_next_type(T_ARR, NULL);
+                    $$ = $1;
+                 }
+                 | direct_declarator '[' STATIC type_qualifier_list assignment_expression']' {
+
+                 } // Optional
                  | direct_declarator '[' STATIC assignment_expression']'
                  | direct_declarator '[' type_qualifier_list STATIC assignment_expression']'
                  | direct_declarator '[' type_qualifier_list '*' ']'  // Optional
@@ -527,7 +624,7 @@ pointer: '*' type_qualifier_list // Optional
        ;
 
 type_qualifier_list: type_qualifier
-                   | type_qualifier_list type_qualifier
+                   | type_qualifier_list type_qualifier {$$ = $1 | $2;}
                    ;
 
 parameter_type_list: parameter_list

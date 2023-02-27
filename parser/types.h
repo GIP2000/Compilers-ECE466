@@ -1,22 +1,18 @@
 #include "./symbol_table.h"
 #include <stdlib.h>
 enum Types {
+    T_VOID,
     T_SHORT,
     T_INT,
-    T_LONG,
-    T_LONGLONG,
-    T_USHORT,
-    T_UINT,
-    T_ULONG,
-    T_ULONGLONG,
     T_CHAR,
-    T_UCHAR,
     T_FLOAT,
     T_DOUBLE,
-    T_LONGDOUBLE,
-    T_POINTER,
+    T_POINTER, // next range
+    T_SIGNED,
+    T_UNSIGNED,
+    T_LONG,
     T_ARR,
-    T_TYPEDEF,
+    T_TYPEDEF, // end next range
     T_FUNC,
     T_STRUCT,
     T_UNION,
@@ -29,6 +25,7 @@ struct Type {
     union {
         struct {
             struct Type *next;
+            struct AstNode *arr_size_expression;
         } next_type;
         struct {
             struct Type *ret;
@@ -42,6 +39,8 @@ struct Type {
 };
 
 void free_type(struct Type *type, int free_end);
+
+void add_or_throw_type(struct Type *parent, struct Type *child);
 
 struct Type *make_default_type(enum Types type);
 struct Type *make_next_type(enum Types type, struct Type *next);

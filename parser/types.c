@@ -1,6 +1,9 @@
 #include "./types.h"
 #include "./symbol_table.h"
+#include <stdio.h>
 #include <string.h>
+
+extern void yyerror(char *);
 
 struct Type *clone_type(struct Type *type) {
     struct Type *new_type = (struct Type *)malloc(sizeof(struct Type));
@@ -85,4 +88,11 @@ struct Type *make_func_type(struct Type *ret, struct SymbolTable *pt) {
     // should be able to run pop on the symbol table now
 
     return type_obj;
+}
+void add_or_throw_type(struct Type *parent, struct Type *child) {
+    if (!(parent->type >= T_POINTER && parent->type <= T_TYPEDEF)) {
+        yyerror("Invalid Type Defintion");
+        exit(2);
+    }
+    parent->extentions.next_type.next = child;
 }
