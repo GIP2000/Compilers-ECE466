@@ -606,12 +606,32 @@ direct_declarator: IDENT {
                     $$ = $1;
                  }
                  | direct_declarator '[' STATIC type_qualifier_list assignment_expression']' {
-
+                    $1.val.sc = Q_STATIC;
+                    $1.val.qualifier_bit_mask = $4;
+                    merge_if_next($1.val.type, make_next_type(T_ARR, NULL));
+                    $1.val.type->next_type.extentions.next_type.arr_size_expression = $5;
+                    $$ = $1;
                  } // Optional
-                 | direct_declarator '[' STATIC assignment_expression']'
-                 | direct_declarator '[' type_qualifier_list STATIC assignment_expression']'
-                 | direct_declarator '[' type_qualifier_list '*' ']'  // Optional
-                 | direct_declarator '[' '*' ']'
+                 | direct_declarator '[' STATIC assignment_expression']' {
+                    $1.val.sc = Q_STATIC;
+                    merge_if_next($1.val.type, make_next_type(T_ARR, NULL));
+                    $1.val.type->next_type.extentions.next_type.arr_size_expression = $4;
+                    $$ = $1;
+
+                 }
+                 | direct_declarator '[' type_qualifier_list STATIC assignment_expression']' {
+                    $1.val.sc = Q_STATIC;
+                    $1.val.qualifier_bit_mask = $3;
+                    merge_if_next($1.val.type, make_next_type(T_ARR, NULL));
+                    $1.val.type->next_type.extentions.next_type.arr_size_expression = $5;
+                    $$ = $1;
+                 }
+                 | direct_declarator '[' type_qualifier_list '*' ']'  {
+                    $1.val.qualifier_bit_mask = $3;
+                    merge_if_next($1.val.type, make_next_type(T_ARR, NULL));
+                    $$ = $1;
+                 }// Optional
+                 | direct_declarator '[' '*' ']' {$$ = $1;}
                  | direct_declarator '(' parameter_type_list ')'
                  | direct_declarator '(' identifier_list ')'  // Optional
                  | direct_declarator '(' ')'

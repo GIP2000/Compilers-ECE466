@@ -38,6 +38,8 @@ struct Type {
     } extentions;
 };
 
+struct Type *merge_if_next(struct Type *parent, struct Type *chlid);
+
 void free_type(struct Type *type, int free_end);
 
 void add_or_throw_type(struct Type *parent, struct Type *child);
