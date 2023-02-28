@@ -587,22 +587,22 @@ direct_declarator: IDENT {
                  }
                  | direct_declarator '[' type_qualifier_list assignment_expression ']' {
                     $1.val.qualifier_bit_mask = $3;
-                    $1.val.type = make_next_type(T_ARR, NULL);
+                    merge_if_next($1.val.type, make_next_type(T_ARR, NULL));
                     $1.val.type->next_type.extentions.next_type.arr_size_expression = $4;
                     $$ = $1;
                  }// Double Optional
                  | direct_declarator '['type_qualifier_list ']' {
                     $1.val.qualifier_bit_mask = $3;
-                    $1.val.type = make_next_type(T_ARR, NULL);
+                    merge_if_next($1.val.type, make_next_type(T_ARR, NULL));
                     $$ = $1;
                  }
                  | direct_declarator '[' assignment_expression ']' {
-                    $1.val.type = make_next_type(T_ARR, NULL);
+                    merge_if_next($1.val.type, make_next_type(T_ARR, NULL));
                     $1.val.type->next_type.extentions.next_type.arr_size_expression = $3;
                     $$ = $1;
                  }
                  | direct_declarator '[' ']' {
-                    $1.val.type = make_next_type(T_ARR, NULL);
+                    merge_if_next($1.val.type, make_next_type(T_ARR, NULL));
                     $$ = $1;
                  }
                  | direct_declarator '[' STATIC type_qualifier_list assignment_expression']' {

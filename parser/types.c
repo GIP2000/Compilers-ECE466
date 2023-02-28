@@ -89,6 +89,21 @@ struct Type *make_func_type(struct Type *ret, struct SymbolTable *pt) {
 
     return type_obj;
 }
+
+struct Type *merge_if_next(struct Type *parent, struct Type *child) {
+    if (parent == NULL) {
+        return child;
+    }
+
+    if (parent->type >= T_POINTER && parent->type <= T_TYPEDEF) {
+        parent->extentions.next_type.next = child;
+        return parent;
+    }
+    fprintf(stderr, "This should never happen"); // this might be a syntax error
+                                                 // I should check
+    exit(2);
+}
+
 void add_or_throw_type(struct Type *parent, struct Type *child) {
     if (!(parent->type >= T_POINTER && parent->type <= T_TYPEDEF)) {
         yyerror("Invalid Type Defintion");
