@@ -37,15 +37,20 @@ struct FuncCall {
     struct AstNodeListNode arguments;
 };
 
-#define ASTNODE_DECLARATORLIST 8
-struct DeclaratorList {
-    struct DeclaratorListNode *tail;
-    struct DeclaratorListNode *head;
+#define ASTNODE_STATMENTLIST 8
+struct StatmentList {
+    struct StatmentListNode *tail;
+    struct StatmentListNode *head;
 };
 
-struct DeclaratorListNode {
-    struct SymbolTableNode *node;
-    struct DeclaratorListNode *next;
+struct StatmentListNode {
+    struct AstNode *node;
+    struct StatmentListNode *next;
+};
+
+#define ASTNODE_DECLARATION 9
+struct Declaration {
+    struct SymbolTableNode *symbol;
 };
 
 struct AstNode {
@@ -58,7 +63,8 @@ struct AstNode {
         struct BinaryOp binary_op;
         struct TernayOp ternary_op;
         struct FuncCall func_call;
-        struct DeclaratorList declarator_list;
+        struct StatmentList statments;
+        struct Declaration declaration;
     };
 };
 
@@ -73,9 +79,13 @@ struct AstNodeListNode *make_node_list_node(AstNode *node);
 struct AstNodeListNode *append_AstNodeListNode(struct AstNodeListNode *,
                                                AstNode *next);
 
-AstNode *make_DeclaratorList(struct SymbolTableNode *n);
+AstNode *make_StatementList(AstNode *n);
 
-void append_DeclaratorList(AstNode *declarator_list, struct SymbolTableNode *n);
+void append_StatmentList(struct StatmentList *statment_list,
+                         struct AstNode *next);
+
+struct StatmentListNode *make_StatmentListNode(AstNode *n);
+AstNode *make_Declaration(struct SymbolTableNode *node);
 
 AstNode *make_IdentNode(YYlvalStrLit val);
 

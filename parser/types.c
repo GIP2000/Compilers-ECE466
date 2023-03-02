@@ -90,6 +90,22 @@ struct Type *make_func_type(struct Type *ret, struct SymbolTable *pt) {
     return type_obj;
 }
 
+void reverse_next(struct Type *start) {
+
+    struct Type *prev = NULL;
+    struct Type *next = NULL;
+    struct Type *current;
+    int i;
+    for (i = 0, current = start;
+         current != NULL && current->type >= T_POINTER &&
+         current->type <= T_TYPEDEF;
+         ++i, current = next) {
+        next = current->extentions.next_type.next;
+        current->extentions.next_type.next = prev;
+        prev = current;
+    }
+}
+
 struct Type *merge_if_next(struct Type *parent, struct Type *child) {
     if (parent == NULL) {
         return child;
@@ -99,8 +115,9 @@ struct Type *merge_if_next(struct Type *parent, struct Type *child) {
         parent->extentions.next_type.next = child;
         return parent;
     }
-    fprintf(stderr, "This should never happen"); // this might be a syntax error
-                                                 // I should check
+    fprintf(stderr, "This should never happen"); // this might be a syntax
+                                                 // error
+    // I should check
     exit(2);
 }
 

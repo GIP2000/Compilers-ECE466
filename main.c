@@ -29,7 +29,7 @@ int main(int argc, char **argv) {
         }
         file_info.file_line_start = 0;
         if (file_info.file_name != NULL) {
-            free(file_info.file_name);
+            // free(file_info.file_name);
         }
         file_info.file_name =
             (char *)malloc(sizeof(char) * strnlen(argv[i], PATH_MAX));

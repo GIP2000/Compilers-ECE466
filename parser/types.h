@@ -62,5 +62,6 @@ void add_or_throw_type(struct Type *parent, struct Type *child);
 
 struct Type *make_default_type(enum Types type);
 struct Type *make_next_type(enum Types type, struct Type *next);
+void reverse_next(struct Type *start);
 
 struct Type *make_func_type(struct Type *ret, struct SymbolTable *pt);

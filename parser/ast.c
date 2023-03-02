@@ -67,25 +67,27 @@ AstNode *make_func_call(AstNode *name, struct AstNodeListNode *arguments) {
     return ast;
 }
 
-struct DeclaratorListNode *make_DeclaratorListNode(struct SymbolTableNode *n) {
-    struct DeclaratorListNode *node =
-        (struct DeclaratorListNode *)malloc(sizeof(struct DeclaratorListNode));
+struct StatmentListNode *make_StatmentListNode(AstNode *n) {
+    struct StatmentListNode *node =
+        (struct StatmentListNode *)malloc(sizeof(struct StatmentListNode));
     node->node = n;
+    node->next = NULL;
     return node;
 }
 
-AstNode *make_DeclaratorList(struct SymbolTableNode *n) {
-    AstNode *ast = make_AstNode(ASTNODE_DECLARATORLIST);
-    struct DeclaratorListNode *node = make_DeclaratorListNode(n);
-    ast->declarator_list.head = node;
-    ast->declarator_list.tail = node;
+AstNode *make_StatementList(AstNode *node) {
+    AstNode *ast = make_AstNode(ASTNODE_STATMENTLIST);
+    struct StatmentListNode *list_node = make_StatmentListNode(node);
+    ast->statments.head = list_node;
+    ast->statments.tail = list_node;
     return ast;
 }
-void append_DeclaratorList(AstNode *declarator_list,
-                           struct SymbolTableNode *n) {
-    struct DeclaratorListNode *node = make_DeclaratorListNode(n);
-    declarator_list->declarator_list.tail->next = node;
-    declarator_list->declarator_list.tail = node;
+
+void append_StatmentList(struct StatmentList *statment_list,
+                         struct AstNode *next) {
+    struct StatmentListNode *list_node = make_StatmentListNode(next);
+    statment_list->tail->next = list_node;
+    statment_list->tail = list_node;
 }
 
 struct AstNodeListNode *make_node_list_node(AstNode *node) {
@@ -94,6 +96,11 @@ struct AstNodeListNode *make_node_list_node(AstNode *node) {
     head->val = node;
     head->next = NULL;
     return head;
+}
+AstNode *make_Declaration(struct SymbolTableNode *symbol) {
+    AstNode *ast = make_AstNode(ASTNODE_DECLARATION);
+    ast->declaration.symbol = symbol;
+    return ast;
 }
 
 struct AstNodeListNode *append_AstNodeListNode(struct AstNodeListNode *node,

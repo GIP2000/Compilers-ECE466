@@ -97,7 +97,7 @@
 %token LN
 
 // types
-%type <astnode> constant primary_expression expression postfix_expression unary_expression cast_expression multiplicative_expression additive_expression shift_expression relational_expression equality_expression and_expression exclusive_or_expression inclusive_or_expression logical_and_expression logical_or_expression conditional_expression assignment_expression init_declarator_list initalizer parameter_list
+%type <astnode> constant primary_expression expression postfix_expression unary_expression cast_expression multiplicative_expression additive_expression shift_expression relational_expression equality_expression and_expression exclusive_or_expression inclusive_or_expression logical_and_expression logical_or_expression conditional_expression assignment_expression init_declarator_list initalizer parameter_list declaration statment compound_statment block_item_list block_item
 
 %type <arg_expression_list> argument_expression_list
 %type <storage_class> storage_class_specifier
@@ -116,9 +116,12 @@
 %type <num> CHARLIT
 
 
-%start statment
 //%start translation_unit
 %%
+
+start: declaration {print_AstNode($1, 0);}
+    ;
+
 
 // Notes:
 // Temporary start for assignemnt one
@@ -390,9 +393,9 @@ expression: assignment_expression {
 constant_expression: conditional_expression ;
 
 // 6.7
-declaration: declaration_specifiers init_declarator_list ';' // Optional
-           | declaration_specifiers ';'
-           | static_assert_decleration
+declaration: declaration_specifiers init_declarator_list ';'  {$$ = $2;}// Optional
+           | declaration_specifiers ';' {$$ = NULL;}
+           | static_assert_decleration {fprintf(stderr, "UNIMPLEMNTED"); exit(1);}
            ;
 
 declaration_specifiers: storage_class_specifier declaration_specifiers {
@@ -409,6 +412,7 @@ declaration_specifiers: storage_class_specifier declaration_specifiers {
                         $$ = $2;
                       }// Optional
                       | type_specifier {
+                        fprintf(stderr, "type specifier\n");
                         struct SymbolTableNode n;
                         n.val.type = $1;
                         $$ = n;
@@ -443,7 +447,10 @@ declaration_specifiers: storage_class_specifier declaration_specifiers {
 
 init_declarator_list: init_declarator {
                         struct SymbolTableNode n;
-                        if ($1.val.type->type == T_FUNC) {
+                        if ($1.val.type == NULL) {
+                            n.val.type = $<current_symbol>0.val.type;
+                        } else if ($1.val.type->type == T_FUNC) {
+                            fprintf(stderr, "function?\n");
                             n.val.type = $1.val.type;
                             n.val.type->extentions.func.ret = $<current_symbol>0.val.type;
                         } else {
@@ -458,10 +465,11 @@ init_declarator_list: init_declarator {
                            exit(2);
                         };
 
-                        $$ = make_DeclaratorList(&symbol_table->nodearr[symbol_table->len - 1]);
+                        AstNode * decl =make_Declaration(&symbol_table->nodearr[symbol_table->len - 1]);
+                        $$ = make_StatementList(decl);
                     }
                     | init_declarator_list ',' init_declarator {
-                        struct SymbolTableNode * parent = $1->declarator_list.tail->node;
+                        struct SymbolTableNode * parent = $1->statments.tail->node->declaration.symbol;
                         struct SymbolTableNode n;
                         if ($3.val.type->type == T_FUNC) {
                             n.val.type = $3.val.type;
@@ -473,16 +481,18 @@ init_declarator_list: init_declarator {
                         n.val.sc = parent->val.sc;
                         // TODO fill in IDENT TYPE
                         if(!enter_in_namespace(n, ORD)) { //TODO ord is Temporary
-                           yyerror("Varaible redefinition");
+                           yyerror("Varaible Redefinition");
                            exit(2);
                         };
 
-                        append_DeclaratorList($1, &symbol_table->nodearr[symbol_table->len - 1]);
+
+                        AstNode * decl = make_Declaration(&symbol_table->nodearr[symbol_table->len - 1]);
+                        append_StatmentList(&$1->statments, decl);
                         $$ = $1;
                     }
                     ;
 
-init_declarator: declarator {$$ = $1;}
+init_declarator: declarator {fprintf(stderr, "init declarator\n");$$ = $1;}
                | declarator '=' initalizer {
                     $1.val.initalizer = $3;
                     $$ = $1;
@@ -507,7 +517,7 @@ storage_class_specifier: TYPEDEF {
 type_specifier: VOID {$$ = make_default_type(T_VOID);}
               | CHAR {$$ = make_default_type(T_CHAR);}
               | SHORT {$$ = make_default_type(T_SHORT);}
-              | INT {$$ = make_default_type(T_INT);}
+              | INT {fprintf(stderr,"INT\n"); $$ = make_default_type(T_INT);}
               | LONG {$$ = make_next_type(T_LONG, NULL);}
               | FLOAT {$$ = make_default_type(T_FLOAT);}
               | DOUBLE{$$ = make_default_type(T_DOUBLE);}
@@ -617,12 +627,16 @@ alignment_specifier: _ALIGNAS '(' type_name ')' {
 
 // 6.7.6
 declarator: pointer direct_declarator {
-            // TODO reverse the pointer and push
+           $1->extentions.next_type.next = $2.val.type;
+           reverse_next($1);
+           $2.val.type = $1;
+           $$ = $2;
           }
-          | direct_declarator {$$ = $1;}
+          | direct_declarator {fprintf(stderr, "direct_declarator -> declarator\n");$$ = $1;}
           ;
 
 direct_declarator: IDENT {
+                    fprintf(stderr, "IDENT\n");
                     struct SymbolTableNode n;
                     n.name = $1.str;
                     $$ = n;
@@ -632,34 +646,35 @@ direct_declarator: IDENT {
                  }
                  | direct_declarator '[' type_qualifier_list assignment_expression ']' {
                     $1.val.type->qualifier_bit_mask = $3;
-                    $1.val.type = merge_if_next($1.val.type, make_next_type(T_ARR, NULL));
+                    $1.val.type = make_next_type(T_ARR, $1.val.type);
+                    /* $1.val.type = merge_if_next($1.val.type, make_next_type(T_ARR, NULL)); */
                     $1.val.type->extentions.next_type.arr_size_expression = $4;
                     $$ = $1;
                  }// Double Optional
                  | direct_declarator '['type_qualifier_list ']' {
                     $1.val.type->qualifier_bit_mask = $3;
-                    $1.val.type = merge_if_next($1.val.type, make_next_type(T_ARR, NULL));
+                    $1.val.type = make_next_type(T_ARR, $1.val.type);
                     $$ = $1;
                  }
                  | direct_declarator '[' assignment_expression ']' {
-                    $1.val.type = merge_if_next($1.val.type, make_next_type(T_ARR, NULL));
-                    $1.val.type->extentions.next_type.arr_size_expression = $3;
+                    /* $1.val.type = merge_if_next($1.val.type, make_next_type(T_ARR, NULL)); */
+                    $1.val.type = make_next_type(T_ARR, $1.val.type);
                     $$ = $1;
                  }
                  | direct_declarator '[' ']' {
-                    $1.val.type = merge_if_next($1.val.type, make_next_type(T_ARR, NULL));
+                    $1.val.type = make_next_type(T_ARR, $1.val.type);
                     $$ = $1;
                  }
                  | direct_declarator '[' STATIC type_qualifier_list assignment_expression']' {
                     $1.val.sc = S_STATIC;
                     $1.val.type->qualifier_bit_mask = $4;
-                    $1.val.type = merge_if_next($1.val.type, make_next_type(T_ARR, NULL));
+                    $1.val.type = make_next_type(T_ARR, $1.val.type);
                     $1.val.type->extentions.next_type.arr_size_expression = $5;
                     $$ = $1;
                  } // Optional
                  | direct_declarator '[' STATIC assignment_expression']' {
                     $1.val.sc = S_STATIC;
-                    $1.val.type = merge_if_next($1.val.type, make_next_type(T_ARR, NULL));
+                    $1.val.type = make_next_type(T_ARR, $1.val.type);
                     $1.val.type->extentions.next_type.arr_size_expression = $4;
                     $$ = $1;
 
@@ -667,13 +682,13 @@ direct_declarator: IDENT {
                  | direct_declarator '[' type_qualifier_list STATIC assignment_expression']' {
                     $1.val.sc = S_STATIC;
                     $1.val.type->qualifier_bit_mask = $3;
-                    $1.val.type = merge_if_next($1.val.type, make_next_type(T_ARR, NULL));
+                    $1.val.type = make_next_type(T_ARR, $1.val.type);
                     $1.val.type->extentions.next_type.arr_size_expression = $5;
                     $$ = $1;
                  }
                  | direct_declarator '[' type_qualifier_list '*' ']'  {
                     $1.val.type->qualifier_bit_mask = $3;
-                    $1.val.type = merge_if_next($1.val.type, make_next_type(T_ARR, NULL));
+                    $1.val.type = make_next_type(T_ARR, $1.val.type);
                     $$ = $1;
                  }// Optional
                  | direct_declarator '[' '*' ']' {$$ = $1;}
@@ -822,12 +837,14 @@ labeled_statment: IDENT ':' statment
                 ;
 
 // 6.8.2
-compound_statment: '{' block_item_list '}' // Optional
-                 | '{' '}'
+compound_statment: '{' block_item_list '}' { // Optional
+                    $$ = $2;
+                 }
+                 | '{' '}' {$$ = NULL;}
                  ;
 
-block_item_list: block_item
-               | block_item_list block_item
+block_item_list: block_item {$$ = make_StatementList($1);}
+               | block_item_list block_item {append_StatmentList(&$1->statments, $2); $$ = $1;}
                ;
 
 block_item: declaration

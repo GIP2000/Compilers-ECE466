@@ -4,7 +4,7 @@ all: gip
 FLAGS = -Wall -Wextra
 
 parser.tab.c parser.tab.h: parser/parser.y
-	bison -v -k -d parser/parser.y
+	bison -v -k -d --debug parser/parser.y
 
 parser.tab.o: parser.tab.c
 	gcc $(FLAGS) -c parser.tab.c -o parser.tab.o
