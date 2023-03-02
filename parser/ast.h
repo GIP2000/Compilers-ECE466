@@ -1,5 +1,6 @@
 #pragma once
 #include "./yylval_types.h"
+#include "symbol_table.h"
 
 #define ASTNODE_CONSTANT 1
 #define ASTNODE_STRLIT 2
@@ -36,6 +37,17 @@ struct FuncCall {
     struct AstNodeListNode arguments;
 };
 
+#define ASTNODE_DECLARATORLIST 8
+struct DeclaratorList {
+    struct DeclaratorListNode *tail;
+    struct DeclaratorListNode *head;
+};
+
+struct DeclaratorListNode {
+    struct SymbolTableNode *node;
+    struct DeclaratorListNode *next;
+};
+
 struct AstNode {
     int type;
     union {
@@ -46,6 +58,7 @@ struct AstNode {
         struct BinaryOp binary_op;
         struct TernayOp ternary_op;
         struct FuncCall func_call;
+        struct DeclaratorList declarator_list;
     };
 };
 
@@ -59,6 +72,10 @@ struct AstNodeListNode *make_node_list_node(AstNode *node);
 
 struct AstNodeListNode *append_AstNodeListNode(struct AstNodeListNode *,
                                                AstNode *next);
+
+AstNode *make_DeclaratorList(struct SymbolTableNode *n);
+
+void append_DeclaratorList(AstNode *declarator_list, struct SymbolTableNode *n);
 
 AstNode *make_IdentNode(YYlvalStrLit val);
 

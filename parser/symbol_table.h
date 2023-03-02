@@ -2,18 +2,6 @@
 #include <stdlib.h>
 enum IdentType { VARIABLE, FUNCTION, TYPEDEFNAME, TAG, LABELNAME, MEMBER };
 
-enum TypeQualifier {
-    Q_CONST = 0,    // 000
-    Q_RESTRICT = 1, // 001
-    Q_VOLATILE = 2, // 010
-    Q__ATOMIC = 4,  // 100
-};
-
-enum FunctionSpecifier {
-    F_INLINE = 0,
-    F__NORETURN = 1,
-};
-
 enum StorageClass {
     S_EXTERN,
     S_AUTO,
@@ -41,9 +29,8 @@ struct SymbolTableNode {
     enum IdentType type;
     struct {
         enum StorageClass sc;
-        int qualifier_bit_mask;
-        int function_spec_bit_mask;
         struct Type *type;
+        struct AstNode *initalizer;
     } val;
 };
 
@@ -53,6 +40,6 @@ void create_namespace();
 
 int find_in_namespace(char *name, enum Namespace namespc);
 
-int enter_in_namespace(char *name, enum Namespace namespc);
+int enter_in_namespace(struct SymbolTableNode node, enum Namespace namespc);
 
 void pop_symbol_table();

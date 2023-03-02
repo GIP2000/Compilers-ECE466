@@ -53,8 +53,8 @@ int find_in_table(char *name, enum Namespace namespc, struct SymbolTable *ct) {
 }
 
 // maybe change this to void and instead exit on error
-int enter_in_namespace(char *name, enum Namespace namespc) {
-    if (find_in_table(name, namespc, symbol_table)) {
+int enter_in_namespace(struct SymbolTableNode node, enum Namespace namespc) {
+    if (find_in_table(node.name, namespc, symbol_table)) {
         // handle specific cases like function prototypes ...
         return 0;
     }
@@ -66,9 +66,7 @@ int enter_in_namespace(char *name, enum Namespace namespc) {
         symbol_table->capacity = symbol_table->len + 10;
     }
 
-    struct SymbolTableNode *node = &symbol_table->nodearr[symbol_table->len++];
-    node->name = name;
-    node->namespc = namespc;
+    symbol_table->nodearr[symbol_table->len++] = node;
 
     return 1;
 }

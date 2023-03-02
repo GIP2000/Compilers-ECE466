@@ -1,5 +1,18 @@
 #include "./symbol_table.h"
 #include <stdlib.h>
+
+enum TypeQualifier {
+    Q_CONST = 0,    // 000
+    Q_RESTRICT = 1, // 001
+    Q_VOLATILE = 2, // 010
+    Q__ATOMIC = 4,  // 100
+};
+
+enum FunctionSpecifier {
+    F_INLINE = 0,
+    F__NORETURN = 1,
+};
+
 enum Types {
     T_VOID,
     T_SHORT,
@@ -22,13 +35,16 @@ enum Types {
 
 struct Type {
     enum Types type;
+    int qualifier_bit_mask;
     union {
         struct {
             struct Type *next;
             struct AstNode *arr_size_expression;
         } next_type;
         struct {
+            int function_spec_bit_mask;
             struct Type *ret;
+
             size_t arg_count;
             struct Type *args;
         } func;

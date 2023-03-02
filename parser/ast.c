@@ -1,5 +1,6 @@
 #include "./ast.h"
 #include "../parser.tab.h"
+#include "symbol_table.h"
 #include <ctype.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -33,6 +34,7 @@ AstNode *make_IdentNode(YYlvalStrLit val) {
     ast->ident = val.str;
     return ast;
 }
+
 AstNode *make_ternary_op(AstNode *cond, AstNode *truthy, AstNode *falsey) {
     AstNode *ast = make_AstNode(ASTNODE_TERNAYROP);
     ast->ternary_op.cond = cond;
@@ -63,6 +65,27 @@ AstNode *make_func_call(AstNode *name, struct AstNodeListNode *arguments) {
     ast->func_call.argument_count = i;
 
     return ast;
+}
+
+struct DeclaratorListNode *make_DeclaratorListNode(struct SymbolTableNode *n) {
+    struct DeclaratorListNode *node =
+        (struct DeclaratorListNode *)malloc(sizeof(struct DeclaratorListNode));
+    node->node = n;
+    return node;
+}
+
+AstNode *make_DeclaratorList(struct SymbolTableNode *n) {
+    AstNode *ast = make_AstNode(ASTNODE_DECLARATORLIST);
+    struct DeclaratorListNode *node = make_DeclaratorListNode(n);
+    ast->declarator_list.head = node;
+    ast->declarator_list.tail = node;
+    return ast;
+}
+void append_DeclaratorList(AstNode *declarator_list,
+                           struct SymbolTableNode *n) {
+    struct DeclaratorListNode *node = make_DeclaratorListNode(n);
+    declarator_list->declarator_list.tail->next = node;
+    declarator_list->declarator_list.tail = node;
 }
 
 struct AstNodeListNode *make_node_list_node(AstNode *node) {
