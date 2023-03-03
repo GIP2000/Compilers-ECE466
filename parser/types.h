@@ -2,15 +2,17 @@
 #include <stdlib.h>
 
 enum TypeQualifier {
-    Q_CONST = 0,    // 000
-    Q_RESTRICT = 1, // 001
-    Q_VOLATILE = 2, // 010
-    Q__ATOMIC = 4,  // 100
+    Q_NONE = 0,     // 0000
+    Q_CONST = 1,    // 0001
+    Q_RESTRICT = 2, // 0010
+    Q_VOLATILE = 4, // 0100
+    Q__ATOMIC = 8,  // 1000
 };
 
 enum FunctionSpecifier {
-    F_INLINE = 0,
-    F__NORETURN = 1,
+    F_NONE = 0,      // 00
+    F_INLINE = 1,    // 01
+    F__NORETURN = 2, // 10
 };
 
 enum Types {
@@ -54,6 +56,8 @@ struct Type {
     } extentions;
 };
 
+void print_type(struct Type *type);
+
 struct Type *merge_if_next(struct Type *parent, struct Type *chlid);
 
 void free_type(struct Type *type, int free_end);
@@ -62,6 +66,6 @@ void add_or_throw_type(struct Type *parent, struct Type *child);
 
 struct Type *make_default_type(enum Types type);
 struct Type *make_next_type(enum Types type, struct Type *next);
-void reverse_next(struct Type *start);
+struct Type *reverse_next(struct Type *start);
 
 struct Type *make_func_type(struct Type *ret, struct SymbolTable *pt);

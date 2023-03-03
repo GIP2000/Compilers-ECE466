@@ -35,7 +35,7 @@ void pop_symbol_table() {
     free(old);
 }
 
-void create_namespace() {
+void create_scope() {
     struct SymbolTable *new = initalize_table(10);
     new->parent = symbol_table;
     symbol_table = new;
@@ -80,4 +80,18 @@ int find_in_namespace(char *name, enum Namespace namespc) {
         ct = ct->parent;
     }
     return 0;
+}
+
+struct SymbolTableNode make_st_node(char *name, enum Namespace namespc,
+                                    enum IdentType ident_type,
+                                    enum StorageClass sc, struct Type *type,
+                                    struct AstNode *initalizer) {
+    struct SymbolTableNode n;
+    n.name = name;
+    n.namespc = namespc;
+    n.type = ident_type;
+    n.val.sc = sc;
+    n.val.initalizer = initalizer;
+    n.val.type = type;
+    return n;
 }

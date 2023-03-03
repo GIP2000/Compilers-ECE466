@@ -285,6 +285,28 @@ void print_AstNode(AstNode *head, unsigned int tab_count) {
         }
         return;
     }
+    case ASTNODE_STATMENTLIST: {
+        printf("StatmentList: \n");
+        struct StatmentListNode *start;
+        int i;
+        for (i = 0, start = head->statments.head; start != NULL;
+             start = start->next, ++i) {
+            printf("statment #%d: \n", i);
+            print_AstNode(start->node, tab_count + 1);
+            if (start->next != NULL) {
+                add_tab(tab_count);
+            }
+        }
+        return;
+    }
+    case ASTNODE_DECLARATION:
+        printf(
+            "Decleration: %s namespace (%d) ident_type (%d) sc (%d) type: ",
+            head->declaration.symbol->name, head->declaration.symbol->namespc,
+            head->declaration.symbol->type, head->declaration.symbol->val.sc);
+        print_type(head->declaration.symbol->val.type);
+        printf("\n");
+        return;
     default:
         fprintf(stderr, "Unsuportted Node type %d\n", head->type);
         exit(1);

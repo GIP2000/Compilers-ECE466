@@ -64,6 +64,7 @@ struct Type *make_default_type(enum Types type) {
 
     struct Type *type_obj = (struct Type *)malloc(sizeof(struct Type));
     type_obj->type = type;
+    type_obj->qualifier_bit_mask = 0;
     return type_obj;
 }
 
@@ -90,8 +91,7 @@ struct Type *make_func_type(struct Type *ret, struct SymbolTable *pt) {
     return type_obj;
 }
 
-void reverse_next(struct Type *start) {
-
+struct Type *reverse_next(struct Type *start) {
     struct Type *prev = NULL;
     struct Type *next = NULL;
     struct Type *current;
@@ -104,6 +104,7 @@ void reverse_next(struct Type *start) {
         current->extentions.next_type.next = prev;
         prev = current;
     }
+    return prev;
 }
 
 struct Type *merge_if_next(struct Type *parent, struct Type *child) {
@@ -127,4 +128,87 @@ void add_or_throw_type(struct Type *parent, struct Type *child) {
         exit(2);
     }
     parent->extentions.next_type.next = child;
+}
+
+void print_type(struct Type *type) {
+    switch (type->type) {
+
+    case T_VOID:
+        printf("VOID");
+        break;
+    case T_SHORT:
+        printf("SHORT");
+        break;
+    case T_INT:
+        printf("INT");
+        break;
+    case T_CHAR:
+        printf("CHAR");
+        break;
+    case T_FLOAT:
+        printf("FLOAT");
+        break;
+    case T_DOUBLE:
+        printf("DOUBLE");
+        break;
+    case T_POINTER:
+        printf("POINTER");
+        break; // next range
+    case T_SIGNED:
+        printf("SIGNED");
+        break;
+    case T_UNSIGNED:
+        printf("UNSIGNED");
+        break;
+    case T_LONG:
+        printf("LONG");
+        break;
+    case T_ARR:
+        printf("ARR");
+        break;
+    case T_TYPEDEF:
+        printf("TYPEDEF");
+        break; // end next range
+    case T_FUNC:
+        printf("FUNC with %zu args", type->extentions.func.arg_count);
+        break;
+    case T_STRUCT:
+        printf("STRUCT");
+        break;
+    case T_UNION:
+        printf("UNION");
+        break;
+    case T_ENUM:
+        printf("ENUM");
+        break;
+    default:
+        fprintf(stderr, "Critical Error ivnalid type");
+        exit(1);
+    }
+
+    printf(" qualifer: (%d)", type->qualifier_bit_mask);
+
+    if (type->type < T_POINTER) {
+        printf("\n");
+        return;
+    }
+
+    if (type->type < T_TYPEDEF) {
+        printf(" -> ");
+        if (type->extentions.next_type.next != NULL) {
+            print_type(type->extentions.next_type.next);
+        }
+        return;
+    }
+
+    if (type->type == T_FUNC) {
+        printf(" ret: ");
+        print_type(type->extentions.func.ret);
+        printf(" args: (");
+        size_t i;
+        for (i = 0; i < type->extentions.func.arg_count; ++i) {
+            print_type(&type->extentions.func.args[i]);
+            printf(", ");
+        }
+    }
 }

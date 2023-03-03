@@ -3,14 +3,14 @@
 enum IdentType { VARIABLE, FUNCTION, TYPEDEFNAME, TAG, LABELNAME, MEMBER };
 
 enum StorageClass {
-    S_EXTERN,
     S_AUTO,
+    S_EXTERN,
     S_REG,
     S_STATIC,
 };
 
 enum Namespace {
-    ORD,
+    ORD = 0,
     LABEL,
     MEMS,
     TAGS,
@@ -34,9 +34,14 @@ struct SymbolTableNode {
     } val;
 };
 
+struct SymbolTableNode make_st_node(char *name, enum Namespace namespc,
+                                    enum IdentType ident_type,
+                                    enum StorageClass sc, struct Type *type,
+                                    struct AstNode *initalizer);
+
 struct SymbolTable *initalize_table(size_t capacity);
 
-void create_namespace();
+void create_scope();
 
 int find_in_namespace(char *name, enum Namespace namespc);
 

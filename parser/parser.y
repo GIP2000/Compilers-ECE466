@@ -119,9 +119,8 @@
 //%start translation_unit
 %%
 
-start: declaration {print_AstNode($1, 0);}
-    ;
-
+start: statment  {print_AstNode($1, 0);}
+     | start statment {print_AstNode($2, 0);}
 
 // Notes:
 // Temporary start for assignemnt one
@@ -403,37 +402,45 @@ declaration_specifiers: storage_class_specifier declaration_specifiers {
                           $$ = $2;
                       }// Optional
                       | storage_class_specifier {
-                        struct SymbolTableNode n;
-                        n.val.sc = $1;
-                        $$ = n;
+
+                       $$ = make_st_node(NULL, 0, 0, $1, NULL, NULL);
+                        /* struct SymbolTableNode n; */
+                        /* n.val.sc = $1; */
+                        /* $$ = n; */
                       }
                       | type_specifier declaration_specifiers {
                         add_or_throw_type($2.val.type, $1);
                         $$ = $2;
                       }// Optional
                       | type_specifier {
-                        fprintf(stderr, "type specifier\n");
-                        struct SymbolTableNode n;
-                        n.val.type = $1;
-                        $$ = n;
+                        $$ = make_st_node(NULL, 0, 0, 0, $1, NULL);
+                        /* struct SymbolTableNode n; */
+                        /* n.val.type = $1; */
+                        /* $$ = n; */
                       }
                       | type_qualifier declaration_specifiers {
                         $2.val.type->qualifier_bit_mask |= $1;
                         $$ = $2;
                       }// Optional
                       | type_qualifier {
-                        struct SymbolTableNode n;
-                        n.val.type->qualifier_bit_mask = $1;
-                        $$ = n;
+                        struct Type * t = make_default_type(0);
+                        t->qualifier_bit_mask = $1;
+                        $$ = make_st_node(NULL, 0, 0, 0, t, NULL);
+                        /* struct SymbolTableNode n; */
+                        /* n.val.type->qualifier_bit_mask = $1; */
+                        /* $$ = n; */
                       }
                       | function_specifier declaration_specifiers  {
                         $2.val.type->extentions.func.function_spec_bit_mask |= $1;
                         $$ = $2;
                       }// Optional
                       | function_specifier{
-                        struct SymbolTableNode n;
-                        n.val.type->extentions.func.function_spec_bit_mask = $1;
-                        $$ = n;
+                        struct Type * t = make_default_type(T_FUNC);
+                        t->extentions.func.function_spec_bit_mask = $1;
+                        $$ = make_st_node(NULL, 0, 0, 0, t, NULL);
+                        /* struct SymbolTableNode n; */
+                        /* n.val.type->extentions.func.function_spec_bit_mask = $1; */
+                        /* $$ = n; */
                       }
                       | alignment_specifier declaration_specifiers {
                           yyerror("UNIMPLEMNTED");
@@ -446,20 +453,24 @@ declaration_specifiers: storage_class_specifier declaration_specifiers {
                       ;
 
 init_declarator_list: init_declarator {
-                        struct SymbolTableNode n;
-                        if ($1.val.type == NULL) {
-                            n.val.type = $<current_symbol>0.val.type;
-                        } else if ($1.val.type->type == T_FUNC) {
-                            fprintf(stderr, "function?\n");
-                            n.val.type = $1.val.type;
-                            n.val.type->extentions.func.ret = $<current_symbol>0.val.type;
-                        } else {
-                            n.val.type = merge_if_next($1.val.type, $<current_symbol>0.val.type);
-                        }
-                        n.name = $1.name;
-                        n.val.sc = $<current_symbol>0.val.sc;
-                        // TODO fill in IDENT TYPE
 
+                        struct Type * t;
+                        if ($1.val.type == NULL) {
+                            t = $<current_symbol>0.val.type;
+                        } else if ($1.val.type->type == T_FUNC) {
+                            t = $1.val.type;
+                            t->extentions.func.ret = $<current_symbol>0.val.type;
+                        } else {
+                            t = $1.val.type;
+                            struct Type * start;
+                            for(start = t; start->extentions.next_type.next != NULL; start = start->extentions.next_type.next) {}
+                            start->extentions.next_type.next = $<current_symbol>0.val.type;
+                        }
+                        struct SymbolTableNode n = make_st_node($1.name, $1.namespc, $1.type, $<current_symbol>0.val.sc, t,$1.val.initalizer);
+                        /* n.name = $1.name; */
+                        /* n.val.sc = $<current_symbol>0.val.sc; */
+                        /* // TODO fill in IDENT TYPE */
+                        /**/
                         if(!enter_in_namespace(n, ORD)) { //TODO ord is Temporary
                            yyerror("Varaible redefinition");
                            exit(2);
@@ -492,7 +503,7 @@ init_declarator_list: init_declarator {
                     }
                     ;
 
-init_declarator: declarator {fprintf(stderr, "init declarator\n");$$ = $1;}
+init_declarator: declarator {$$ = $1;}
                | declarator '=' initalizer {
                     $1.val.initalizer = $3;
                     $$ = $1;
@@ -517,7 +528,7 @@ storage_class_specifier: TYPEDEF {
 type_specifier: VOID {$$ = make_default_type(T_VOID);}
               | CHAR {$$ = make_default_type(T_CHAR);}
               | SHORT {$$ = make_default_type(T_SHORT);}
-              | INT {fprintf(stderr,"INT\n"); $$ = make_default_type(T_INT);}
+              | INT {$$ = make_default_type(T_INT);}
               | LONG {$$ = make_next_type(T_LONG, NULL);}
               | FLOAT {$$ = make_default_type(T_FLOAT);}
               | DOUBLE{$$ = make_default_type(T_DOUBLE);}
@@ -627,19 +638,27 @@ alignment_specifier: _ALIGNAS '(' type_name ')' {
 
 // 6.7.6
 declarator: pointer direct_declarator {
-           $1->extentions.next_type.next = $2.val.type;
-           reverse_next($1);
+           print_type($1);
+           printf("\n");
+           if ($2.val.type != NULL) {
+               print_type($2.val.type);
+               printf("\n");
+               $2.val.type->extentions.next_type.next = $1;
+               $1 = $2.val.type;
+           } else {
+              printf("NULL \n");
+           }
+           $1 = reverse_next($1);
            $2.val.type = $1;
            $$ = $2;
           }
-          | direct_declarator {fprintf(stderr, "direct_declarator -> declarator\n");$$ = $1;}
+          | direct_declarator {
+           $$ = $1;
+          }
           ;
 
 direct_declarator: IDENT {
-                    fprintf(stderr, "IDENT\n");
-                    struct SymbolTableNode n;
-                    n.name = $1.str;
-                    $$ = n;
+                    $$ = make_st_node($1.str, ORD, 0, 0, NULL, NULL);
                  }
                  | '(' declarator ')' {
                     $$ = $2; // Double check I interpreted this correctly
@@ -692,8 +711,7 @@ direct_declarator: IDENT {
                     $$ = $1;
                  }// Optional
                  | direct_declarator '[' '*' ']' {$$ = $1;}
-                 | direct_declarator '(' {create_namespace();} parameter_type_list ')'{
-
+                 | direct_declarator '(' {create_scope();} parameter_type_list ')'{
                     /* make_func_type(, symbol_table); */
                     pop_symbol_table();
                  }
@@ -708,13 +726,19 @@ pointer: '*' type_qualifier_list { // Optional
        }
        | '*' {
         $$ = make_next_type(T_POINTER, NULL);
+        print_type($$);
+        printf("alone \n");
        }
        | '*' type_qualifier_list pointer { // Optional
         $$ = make_next_type(T_POINTER, $3);
         $$->qualifier_bit_mask = $2;
+        print_type($$);
+        printf("pair \n");
        }
        | '*' pointer {
            $$ = make_next_type(T_POINTER, $2);
+           print_type($$);
+           printf("pair \n");
        }
        ;
 
@@ -742,12 +766,15 @@ parameter_list: parameter_declaration {
               ;
 
 parameter_declaration: declaration_specifiers declarator {
-                       struct SymbolTableNode n;
-                       n.val.type = merge_if_next($2.val.type,$1.val.type);
-                       n.name = $2.name;
-                       n.type = VARIABLE;
-                       n.val.sc = $1.val.sc;
-                       $$ = n;
+
+
+                       $$ = make_st_node($2.name, ORD, VARIABLE, $1.val.sc, merge_if_next($2.val.type,$1.val.type), NULL);
+                       /* struct SymbolTableNode n; */
+                       /* n.val.type = merge_if_next($2.val.type,$1.val.type); */
+                       /* n.name = $2.name; */
+                       /* n.type = VARIABLE; */
+                       /* n.val.sc = $1.val.sc; */
+                       /* $$ = n; */
                      }
                      | declaration_specifiers abstract_declarator {
                         fprintf(stderr, "UNIMPLEMNTED");
@@ -823,7 +850,8 @@ static_assert_decleration: _STATIC_ASSERT '(' constant_expression ',' STRING ')'
 
 // 6.8
 statment: labeled_statment
-        | compound_statment
+        | declaration
+        /* | compound_statment TODO PUT BACK AFTER TESTING*/
         | expression_statment
         | selection_statment
         | iteration_statment
