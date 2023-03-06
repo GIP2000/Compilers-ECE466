@@ -44,7 +44,7 @@ void create_scope() {
 int find_in_table(char *name, enum Namespace namespc, struct SymbolTable *ct) {
     size_t i;
     for (i = 0; i < ct->len; ++i) {
-        if (strcmp(name, ct->nodearr[i].name) &&
+        if (strcmp(name, ct->nodearr[i].name) == 0 &&
             ct->nodearr[i].namespc == namespc) {
             return 1;
         }

@@ -70,13 +70,24 @@ struct Type *make_default_type(enum Types type) {
 
 struct Type *make_next_type(enum Types type, struct Type *next) {
     struct Type *type_obj = make_default_type(type);
+    if (type == T_ARR && next != NULL && next->type == T_FUNC) {
+        yyerror("Can't make array of functions");
+        exit(2);
+    }
     type_obj->extentions.next_type.next = next;
     return type_obj;
 }
 
-struct Type *make_func_type(struct Type *ret, struct SymbolTable *pt) {
+struct Type *make_func_type(struct Type *ret, struct SymbolTable *pt,
+                            int has_variable_args) {
     struct Type *type_obj = make_default_type(T_FUNC);
-    type_obj->extentions.func.ret = clone_type(ret);
+    type_obj->extentions.func.has_variable_args = has_variable_args;
+    type_obj->extentions.func.ret = ret != NULL ? clone_type(ret) : NULL;
+    if (pt == NULL) {
+        type_obj->extentions.func.arg_count = 0;
+        type_obj->extentions.func.args = NULL;
+        return type_obj;
+    }
     type_obj->extentions.func.arg_count = pt->len;
     type_obj->extentions.func.args =
         (struct Type *)malloc(sizeof(struct Type) * pt->len);
@@ -91,15 +102,44 @@ struct Type *make_func_type(struct Type *ret, struct SymbolTable *pt) {
     return type_obj;
 }
 
-struct Type *reverse_next(struct Type *start) {
+struct Type *reverse_and_merge(struct Type *first, struct Type *second) {
     struct Type *prev = NULL;
     struct Type *next = NULL;
     struct Type *current;
-    int i;
-    for (i = 0, current = start;
-         current != NULL && current->type >= T_POINTER &&
-         current->type <= T_TYPEDEF;
-         ++i, current = next) {
+    for (current = second; current != NULL && current->type >= T_POINTER &&
+                           current->type <= T_TYPEDEF;
+         current = next) {
+        next = current->extentions.next_type.next;
+        current->extentions.next_type.next = prev;
+        prev = current;
+    }
+
+    for (current = first; current != NULL && current->type >= T_POINTER &&
+                          current->type <= T_TYPEDEF;
+         current = next) {
+        next = current->extentions.next_type.next;
+        current->extentions.next_type.next = prev;
+        prev = current;
+    }
+
+    if (current != NULL) {
+        print_type(current);
+        printf("\n");
+        get_last_from_next(prev)->extentions.next_type.next = current;
+    }
+    return prev;
+}
+
+struct Type *reverse_next(struct Type *start) {
+    if (start == NULL || start->type <= T_POINTER || start->type >= T_TYPEDEF) {
+        return start;
+    }
+    struct Type *prev = NULL;
+    struct Type *next = NULL;
+    struct Type *current;
+    for (current = start; current != NULL && current->type >= T_POINTER &&
+                          current->type <= T_TYPEDEF;
+         current = next) {
         next = current->extentions.next_type.next;
         current->extentions.next_type.next = prev;
         prev = current;
@@ -120,6 +160,15 @@ struct Type *merge_if_next(struct Type *parent, struct Type *child) {
                                                  // error
     // I should check
     exit(2);
+}
+
+struct Type *get_last_from_next(struct Type *t) {
+    struct Type *start;
+    for (start = t; start->extentions.next_type.next != NULL &&
+                    start->type >= T_POINTER && start->type <= T_TYPEDEF;
+         start = start->extentions.next_type.next) {
+    }
+    return start;
 }
 
 void add_or_throw_type(struct Type *parent, struct Type *child) {
@@ -203,12 +252,16 @@ void print_type(struct Type *type) {
 
     if (type->type == T_FUNC) {
         printf(" ret: ");
-        print_type(type->extentions.func.ret);
+        if (type->extentions.func.ret == NULL)
+            printf("Unkown");
+        else
+            print_type(type->extentions.func.ret);
         printf(" args: (");
         size_t i;
         for (i = 0; i < type->extentions.func.arg_count; ++i) {
             print_type(&type->extentions.func.args[i]);
             printf(", ");
         }
+        printf(")");
     }
 }

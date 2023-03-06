@@ -459,18 +459,24 @@ init_declarator_list: init_declarator {
                             t = $<current_symbol>0.val.type;
                         } else if ($1.val.type->type == T_FUNC) {
                             t = $1.val.type;
-                            t->extentions.func.ret = $<current_symbol>0.val.type;
+                            if(t->extentions.func.ret == NULL)
+                                t->extentions.func.ret = $<current_symbol>0.val.type;
+                            else
+                                get_last_from_next(t->extentions.func.ret)->extentions.next_type.next = $<current_symbol>0.val.type;
                         } else {
                             t = $1.val.type;
-                            struct Type * start;
-                            for(start = t; start->extentions.next_type.next != NULL; start = start->extentions.next_type.next) {}
-                            start->extentions.next_type.next = $<current_symbol>0.val.type;
+                            struct Type * start = get_last_from_next(t);
+
+                            if (start->type == T_FUNC) {
+                                if(start->extentions.func.ret == NULL)
+                                    start->extentions.func.ret = $<current_symbol>0.val.type;
+                                else
+                                    get_last_from_next(start->extentions.func.ret)->extentions.next_type.next = $<current_symbol>0.val.type;
+                            }
+                            else start->extentions.next_type.next = $<current_symbol>0.val.type;
                         }
                         struct SymbolTableNode n = make_st_node($1.name, $1.namespc, $1.type, $<current_symbol>0.val.sc, t,$1.val.initalizer);
-                        /* n.name = $1.name; */
-                        /* n.val.sc = $<current_symbol>0.val.sc; */
                         /* // TODO fill in IDENT TYPE */
-                        /**/
                         if(!enter_in_namespace(n, ORD)) { //TODO ord is Temporary
                            yyerror("Varaible redefinition");
                            exit(2);
@@ -495,7 +501,6 @@ init_declarator_list: init_declarator {
                            yyerror("Varaible Redefinition");
                            exit(2);
                         };
-
 
                         AstNode * decl = make_Declaration(&symbol_table->nodearr[symbol_table->len - 1]);
                         append_StatmentList(&$1->statments, decl);
@@ -638,22 +643,25 @@ alignment_specifier: _ALIGNAS '(' type_name ')' {
 
 // 6.7.6
 declarator: pointer direct_declarator {
-           print_type($1);
-           printf("\n");
-           if ($2.val.type != NULL) {
-               print_type($2.val.type);
-               printf("\n");
-               $2.val.type->extentions.next_type.next = $1;
-               $1 = $2.val.type;
-           } else {
-              printf("NULL \n");
-           }
+           /* $1 = reverse_and_merge($2.val.type, $1); */
+           /* $2.val.type = $1; */
+           /* $$ = $2; */
+           $2.val.type = reverse_next($2.val.type);
            $1 = reverse_next($1);
-           $2.val.type = $1;
+           struct Type * last = get_last_from_next($2.val.type);
+           if (last->type == T_FUNC) {
+            last->extentions.func.ret = $1;
+           } else {
+            last->extentions.next_type.next = $1;
+           }
+           printf("pre: ");
+           print_type($2.val.type);
+           printf("\n");
            $$ = $2;
           }
           | direct_declarator {
            $$ = $1;
+           $$.val.type = reverse_next($$.val.type);
           }
           ;
 
@@ -661,18 +669,19 @@ direct_declarator: IDENT {
                     $$ = make_st_node($1.str, ORD, 0, 0, NULL, NULL);
                  }
                  | '(' declarator ')' {
+                    /* $2.val.type = reverse_next($2.val.type); */
                     $$ = $2; // Double check I interpreted this correctly
                  }
                  | direct_declarator '[' type_qualifier_list assignment_expression ']' {
-                    $1.val.type->qualifier_bit_mask = $3;
                     $1.val.type = make_next_type(T_ARR, $1.val.type);
+                    $1.val.type->qualifier_bit_mask = $3;
                     /* $1.val.type = merge_if_next($1.val.type, make_next_type(T_ARR, NULL)); */
                     $1.val.type->extentions.next_type.arr_size_expression = $4;
                     $$ = $1;
                  }// Double Optional
                  | direct_declarator '['type_qualifier_list ']' {
-                    $1.val.type->qualifier_bit_mask = $3;
                     $1.val.type = make_next_type(T_ARR, $1.val.type);
+                    $1.val.type->qualifier_bit_mask = $3;
                     $$ = $1;
                  }
                  | direct_declarator '[' assignment_expression ']' {
@@ -686,8 +695,8 @@ direct_declarator: IDENT {
                  }
                  | direct_declarator '[' STATIC type_qualifier_list assignment_expression']' {
                     $1.val.sc = S_STATIC;
-                    $1.val.type->qualifier_bit_mask = $4;
                     $1.val.type = make_next_type(T_ARR, $1.val.type);
+                    $1.val.type->qualifier_bit_mask = $4;
                     $1.val.type->extentions.next_type.arr_size_expression = $5;
                     $$ = $1;
                  } // Optional
@@ -700,23 +709,37 @@ direct_declarator: IDENT {
                  }
                  | direct_declarator '[' type_qualifier_list STATIC assignment_expression']' {
                     $1.val.sc = S_STATIC;
-                    $1.val.type->qualifier_bit_mask = $3;
                     $1.val.type = make_next_type(T_ARR, $1.val.type);
+                    $1.val.type->qualifier_bit_mask = $3;
                     $1.val.type->extentions.next_type.arr_size_expression = $5;
                     $$ = $1;
                  }
                  | direct_declarator '[' type_qualifier_list '*' ']'  {
-                    $1.val.type->qualifier_bit_mask = $3;
                     $1.val.type = make_next_type(T_ARR, $1.val.type);
+                    $1.val.type->qualifier_bit_mask = $3;
                     $$ = $1;
                  }// Optional
                  | direct_declarator '[' '*' ']' {$$ = $1;}
                  | direct_declarator '(' {create_scope();} parameter_type_list ')'{
-                    /* make_func_type(, symbol_table); */
+                    struct Type * t = make_func_type(NULL, symbol_table, $4);
+                    if ($1.val.type != NULL) {
+                        struct Type * last = get_last_from_next($1.val.type);
+                        last->extentions.next_type.next = t;
+                        t = $1.val.type;
+                    }
+                    print_type(t);
+                    printf("\n");
+                    $1.val.type = t;
                     pop_symbol_table();
+                    $$ = $1;
                  }
-                 | direct_declarator '(' identifier_list ')'  // Optional
+                 | direct_declarator '(' identifier_list ')' {
+                    yyerror("K&R Not Supported");
+                    exit(2);
+                 } // Optional
                  | direct_declarator '(' ')' {
+                    $1.val.type = make_func_type(NULL, NULL, 0);
+                    $$ = $1;
                  }
                  ;
 
@@ -726,19 +749,13 @@ pointer: '*' type_qualifier_list { // Optional
        }
        | '*' {
         $$ = make_next_type(T_POINTER, NULL);
-        print_type($$);
-        printf("alone \n");
        }
        | '*' type_qualifier_list pointer { // Optional
         $$ = make_next_type(T_POINTER, $3);
         $$->qualifier_bit_mask = $2;
-        print_type($$);
-        printf("pair \n");
        }
        | '*' pointer {
            $$ = make_next_type(T_POINTER, $2);
-           print_type($$);
-           printf("pair \n");
        }
        ;
 

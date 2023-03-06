@@ -48,6 +48,7 @@ struct Type {
             struct Type *ret;
 
             size_t arg_count;
+            int has_variable_args;
             struct Type *args;
         } func;
         struct {
@@ -68,4 +69,7 @@ struct Type *make_default_type(enum Types type);
 struct Type *make_next_type(enum Types type, struct Type *next);
 struct Type *reverse_next(struct Type *start);
 
-struct Type *make_func_type(struct Type *ret, struct SymbolTable *pt);
+struct Type *reverse_and_merge(struct Type *first, struct Type *second);
+struct Type *make_func_type(struct Type *ret, struct SymbolTable *pt,
+                            int has_variable_args);
+struct Type *get_last_from_next(struct Type *t);
