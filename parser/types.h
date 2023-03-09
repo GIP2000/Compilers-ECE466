@@ -62,6 +62,8 @@ void print_type(struct Type *type);
 
 struct Type *merge_if_next(struct Type *parent, struct Type *chlid);
 
+struct Type *add_to_end_and_reverse(struct Type *source, struct Type *end);
+
 void free_type(struct Type *type, int free_end);
 
 void add_or_throw_type(struct Type *parent, struct Type *child);

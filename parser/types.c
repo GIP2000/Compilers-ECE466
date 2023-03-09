@@ -5,6 +5,39 @@
 
 extern void yyerror(char *);
 
+struct Type *add_to_end_and_reverse(struct Type *source, struct Type *end) {
+    if (end == NULL) {
+        return source;
+    }
+    if (source == NULL) {
+        return end;
+    }
+    if (source->type == T_FUNC) {
+        struct Type *t =
+            add_to_end_and_reverse(source->extentions.func.ret, end);
+        source->extentions.func.ret = t;
+
+    } else if (source->type >= T_POINTER && source->type <= T_TYPEDEF) {
+        struct Type *t = reverse_next(source);
+        struct Type *last = get_last_from_next(t);
+
+        if (last->type >= T_POINTER && last->type <= T_TYPEDEF &&
+            last->extentions.next_type.next == NULL) {
+            last->extentions.next_type.next = end;
+            return t;
+        }
+        // DEBUG REMOVE LATER
+        if (last->type >= T_POINTER && last->type <= T_TYPEDEF &&
+            last->extentions.next_type.next != NULL) {
+            fprintf(stderr, "ERROR should never happen \n");
+        }
+        add_to_end_and_reverse(last, end);
+        return t;
+    }
+
+    return source;
+}
+
 struct Type *clone_type(struct Type *type) {
     struct Type *new_type = (struct Type *)malloc(sizeof(struct Type));
     new_type->type = type->type;
@@ -143,8 +176,6 @@ struct Type *reverse_next(struct Type *start) {
     if (start == NULL || start->type < T_POINTER || start->type > T_TYPEDEF) {
         return start;
     }
-    print_type(start);
-    printf("<- pre reverse\n");
     struct Type *prev = NULL;
     struct Type *next = NULL;
     struct Type *current;
