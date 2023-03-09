@@ -52,7 +52,8 @@ struct Type {
             struct Type *args;
         } func;
         struct {
-            struct SymbolTable mem;
+            struct SymbolTable *mem;
+            int is_struct;
         } st_un;
     } extentions;
 };
@@ -73,3 +74,5 @@ struct Type *reverse_and_merge(struct Type *first, struct Type *second);
 struct Type *make_func_type(struct Type *ret, struct SymbolTable *pt,
                             int has_variable_args);
 struct Type *get_last_from_next(struct Type *t);
+
+struct Type *make_struct_or_union(int is_struct, struct SymbolTable *mem);

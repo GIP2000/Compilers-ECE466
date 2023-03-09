@@ -24,15 +24,23 @@ struct Type *clone_type(struct Type *type) {
             free(temp); // this is ugly but also make sure this works;
         }
     } else if (new_type->type == T_STRUCT || new_type->type == T_UNION) {
-        new_type->extentions.st_un.mem = type->extentions.st_un.mem;
-        memcpy(new_type->extentions.st_un.mem.nodearr,
-               type->extentions.st_un.mem.nodearr,
+        new_type->extentions.st_un.is_struct = type->extentions.st_un.is_struct;
+        new_type->extentions.st_un.mem =
+            (struct SymbolTable *)malloc(sizeof(struct SymbolTable));
+        memcpy(new_type->extentions.st_un.mem, type->extentions.st_un.mem,
+               sizeof(struct SymbolTable));
+        new_type->extentions.st_un.mem->nodearr =
+            (struct SymbolTableNode *)malloc(
+                sizeof(struct SymbolTableNode) *
+                type->extentions.st_un.mem->capacity);
+        memcpy(new_type->extentions.st_un.mem->nodearr,
+               type->extentions.st_un.mem->nodearr,
                sizeof(struct SymbolTableNode) *
-                   type->extentions.st_un.mem.capacity);
+                   type->extentions.st_un.mem->capacity);
         size_t i;
-        for (i = 0; i < new_type->extentions.st_un.mem.len; ++i) {
-            new_type->extentions.st_un.mem.nodearr[i].val.type =
-                clone_type(new_type->extentions.st_un.mem.nodearr[i].val.type);
+        for (i = 0; i < new_type->extentions.st_un.mem->len; ++i) {
+            new_type->extentions.st_un.mem->nodearr[i].val.type =
+                clone_type(new_type->extentions.st_un.mem->nodearr[i].val.type);
         }
     }
     return new_type;
@@ -50,10 +58,10 @@ void free_type(struct Type *type, int free_end) {
         free(type->extentions.func.args);
     } else if (type->type == T_STRUCT || type->type == T_UNION) {
         size_t i;
-        for (i = 0; i < type->extentions.st_un.mem.len; ++i) {
-            free_type(type->extentions.st_un.mem.nodearr[i].val.type, 1);
+        for (i = 0; i < type->extentions.st_un.mem->len; ++i) {
+            free_type(type->extentions.st_un.mem->nodearr[i].val.type, 1);
         }
-        free(type->extentions.st_un.mem.nodearr);
+        free(type->extentions.st_un.mem->nodearr);
     }
     if (free_end) {
         free(type);
@@ -74,6 +82,7 @@ struct Type *make_next_type(enum Types type, struct Type *next) {
         yyerror("Can't make array of functions");
         exit(2);
     }
+
     type_obj->extentions.next_type.next = next;
     return type_obj;
 }
@@ -131,9 +140,11 @@ struct Type *reverse_and_merge(struct Type *first, struct Type *second) {
 }
 
 struct Type *reverse_next(struct Type *start) {
-    if (start == NULL || start->type <= T_POINTER || start->type >= T_TYPEDEF) {
+    if (start == NULL || start->type < T_POINTER || start->type > T_TYPEDEF) {
         return start;
     }
+    print_type(start);
+    printf("<- pre reverse\n");
     struct Type *prev = NULL;
     struct Type *next = NULL;
     struct Type *current;
@@ -143,6 +154,11 @@ struct Type *reverse_next(struct Type *start) {
         next = current->extentions.next_type.next;
         current->extentions.next_type.next = prev;
         prev = current;
+    }
+    if (current != NULL && start != NULL && next != NULL) {
+        // start should be last here
+        // next should have your extra stuff
+        start->extentions.next_type.next = next;
     }
     return prev;
 }
@@ -177,6 +193,13 @@ void add_or_throw_type(struct Type *parent, struct Type *child) {
         exit(2);
     }
     parent->extentions.next_type.next = child;
+}
+
+struct Type *make_struct_or_union(int is_struct, struct SymbolTable *mem) {
+    struct Type *t = make_default_type(T_STRUCT);
+    t->extentions.st_un.is_struct = is_struct;
+    t->extentions.st_un.mem = mem;
+    return t;
 }
 
 void print_type(struct Type *type) {
@@ -231,14 +254,14 @@ void print_type(struct Type *type) {
         printf("ENUM");
         break;
     default:
-        fprintf(stderr, "Critical Error ivnalid type");
+        fprintf(stderr, "Critical Error Invalid Type");
         exit(1);
     }
 
     printf(" qualifer: (%d)", type->qualifier_bit_mask);
 
     if (type->type < T_POINTER) {
-        printf("\n");
+        //     printf("\n");
         return;
     }
 
@@ -260,6 +283,20 @@ void print_type(struct Type *type) {
         size_t i;
         for (i = 0; i < type->extentions.func.arg_count; ++i) {
             print_type(&type->extentions.func.args[i]);
+            printf(", ");
+        }
+        printf(")");
+    }
+
+    if (type->type == T_STRUCT) {
+        printf(" members: (");
+        size_t i;
+        for (i = 0; i < type->extentions.st_un.mem->len; ++i) {
+
+            print_type(type->extentions.st_un.mem->nodearr[i].val.type);
+            if (type->extentions.st_un.mem->nodearr[i].name != NULL) {
+                printf(" %s", type->extentions.st_un.mem->nodearr[i].name);
+            }
             printf(", ");
         }
         printf(")");

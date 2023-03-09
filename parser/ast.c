@@ -225,7 +225,7 @@ void add_tab(unsigned int tab_count) {
 // print in a dfs fasion
 void print_AstNode(AstNode *head, unsigned int tab_count) {
     if (head == NULL) {
-        printf("NULL founnd\n");
+        printf("NULL found\n");
         return;
     }
     // make the tabs

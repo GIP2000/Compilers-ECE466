@@ -97,16 +97,16 @@
 %token LN
 
 // types
-%type <astnode> constant primary_expression expression postfix_expression unary_expression cast_expression multiplicative_expression additive_expression shift_expression relational_expression equality_expression and_expression exclusive_or_expression inclusive_or_expression logical_and_expression logical_or_expression conditional_expression assignment_expression init_declarator_list initalizer parameter_list declaration statment compound_statment block_item_list block_item
+%type <astnode> constant primary_expression expression postfix_expression unary_expression cast_expression multiplicative_expression additive_expression shift_expression relational_expression equality_expression and_expression exclusive_or_expression inclusive_or_expression logical_and_expression logical_or_expression conditional_expression assignment_expression init_declarator_list initalizer parameter_list declaration statment compound_statment block_item_list block_item struct_declaration_list struct_declaration
 
 %type <arg_expression_list> argument_expression_list
 %type <storage_class> storage_class_specifier
-%type <current_symbol> declaration_specifiers direct_declarator declarator init_declarator parameter_declaration
-%type <type> type_specifier pointer
+%type <current_symbol> declaration_specifiers direct_declarator declarator init_declarator parameter_declaration struct_declarator struct_declarator_list
+%type <type> type_specifier pointer struct_or_union_specifier specifier_qualifer_list
 %type <type_qualifier> type_qualifier type_qualifier_list
 %type <function_specifier> function_specifier
 %type <str> IDENT
-%type <flag> parameter_type_list
+%type <flag> parameter_type_list struct_or_union
 
 
 
@@ -402,11 +402,7 @@ declaration_specifiers: storage_class_specifier declaration_specifiers {
                           $$ = $2;
                       }// Optional
                       | storage_class_specifier {
-
                        $$ = make_st_node(NULL, 0, 0, $1, NULL, NULL);
-                        /* struct SymbolTableNode n; */
-                        /* n.val.sc = $1; */
-                        /* $$ = n; */
                       }
                       | type_specifier declaration_specifiers {
                         add_or_throw_type($2.val.type, $1);
@@ -414,9 +410,6 @@ declaration_specifiers: storage_class_specifier declaration_specifiers {
                       }// Optional
                       | type_specifier {
                         $$ = make_st_node(NULL, 0, 0, 0, $1, NULL);
-                        /* struct SymbolTableNode n; */
-                        /* n.val.type = $1; */
-                        /* $$ = n; */
                       }
                       | type_qualifier declaration_specifiers {
                         $2.val.type->qualifier_bit_mask |= $1;
@@ -426,21 +419,15 @@ declaration_specifiers: storage_class_specifier declaration_specifiers {
                         struct Type * t = make_default_type(0);
                         t->qualifier_bit_mask = $1;
                         $$ = make_st_node(NULL, 0, 0, 0, t, NULL);
-                        /* struct SymbolTableNode n; */
-                        /* n.val.type->qualifier_bit_mask = $1; */
-                        /* $$ = n; */
                       }
                       | function_specifier declaration_specifiers  {
                         $2.val.type->extentions.func.function_spec_bit_mask |= $1;
                         $$ = $2;
                       }// Optional
-                      | function_specifier{
+                      | function_specifier {
                         struct Type * t = make_default_type(T_FUNC);
                         t->extentions.func.function_spec_bit_mask = $1;
                         $$ = make_st_node(NULL, 0, 0, 0, t, NULL);
-                        /* struct SymbolTableNode n; */
-                        /* n.val.type->extentions.func.function_spec_bit_mask = $1; */
-                        /* $$ = n; */
                       }
                       | alignment_specifier declaration_specifiers {
                           yyerror("UNIMPLEMNTED");
@@ -453,7 +440,6 @@ declaration_specifiers: storage_class_specifier declaration_specifiers {
                       ;
 
 init_declarator_list: init_declarator {
-
                         struct Type * t;
                         if ($1.val.type == NULL) {
                             t = $<current_symbol>0.val.type;
@@ -461,17 +447,22 @@ init_declarator_list: init_declarator {
                             t = $1.val.type;
                             if(t->extentions.func.ret == NULL)
                                 t->extentions.func.ret = $<current_symbol>0.val.type;
-                            else
+                            else {
+                                $1.val.type->extentions.func.ret = reverse_next(t->extentions.func.ret);
+                                t = $1.val.type;
                                 get_last_from_next(t->extentions.func.ret)->extentions.next_type.next = $<current_symbol>0.val.type;
+                            }
                         } else {
-                            t = $1.val.type;
+                            t = reverse_next($1.val.type);
+                            $1.val.type = t;
                             struct Type * start = get_last_from_next(t);
-
                             if (start->type == T_FUNC) {
                                 if(start->extentions.func.ret == NULL)
                                     start->extentions.func.ret = $<current_symbol>0.val.type;
-                                else
+                                else {
+                                    start->extentions.func.ret = reverse_next(start->extentions.func.ret);
                                     get_last_from_next(start->extentions.func.ret)->extentions.next_type.next = $<current_symbol>0.val.type;
+                                }
                             }
                             else start->extentions.next_type.next = $<current_symbol>0.val.type;
                         }
@@ -482,23 +473,41 @@ init_declarator_list: init_declarator {
                            exit(2);
                         };
 
-                        AstNode * decl =make_Declaration(&symbol_table->nodearr[symbol_table->len - 1]);
+                        AstNode * decl = make_Declaration(&symbol_table->nodearr[symbol_table->len - 1]);
                         $$ = make_StatementList(decl);
                     }
                     | init_declarator_list ',' init_declarator {
-                        struct SymbolTableNode * parent = $1->statments.tail->node->declaration.symbol;
-                        struct SymbolTableNode n;
-                        if ($3.val.type->type == T_FUNC) {
-                            n.val.type = $3.val.type;
-                            n.val.type->extentions.func.ret = parent->val.type;
+                        struct Type * t;
+                        struct SymbolTableNode *n = $1->statments.head->node->declaration.symbol;
+                        if ($3.val.type == NULL) {
+                            t = n->val.type;
+                        } else if ($3.val.type->type == T_FUNC) {
+                            t = $3.val.type;
+                            if(t->extentions.func.ret == NULL)
+                                t->extentions.func.ret = n->val.type;
+                            else {
+                                $3.val.type->extentions.func.ret = reverse_next(t->extentions.func.ret);
+                                t = $3.val.type;
+                                get_last_from_next(t->extentions.func.ret)->extentions.next_type.next = n->val.type;
+                            }
                         } else {
-                            n.val.type = merge_if_next($3.val.type, parent->val.type);
+                            t = reverse_next($3.val.type);
+                            $3.val.type = t;
+                            struct Type * start = get_last_from_next(t);
+                            if (start->type == T_FUNC) {
+                                if(start->extentions.func.ret == NULL)
+                                    start->extentions.func.ret = n->val.type;
+                                else {
+                                    start->extentions.func.ret = reverse_next(start->extentions.func.ret);
+                                    get_last_from_next(start->extentions.func.ret)->extentions.next_type.next = n->val.type;
+                                }
+                            }
+                            else start->extentions.next_type.next = n->val.type;
                         }
-                        n.name = $3.name;
-                        n.val.sc = parent->val.sc;
-                        // TODO fill in IDENT TYPE
-                        if(!enter_in_namespace(n, ORD)) { //TODO ord is Temporary
-                           yyerror("Varaible Redefinition");
+                        struct SymbolTableNode node = make_st_node($3.name, $3.namespc, $3.type, n->val.sc, t,$3.val.initalizer);
+                        /* // TODO fill in IDENT TYPE */
+                        if(!enter_in_namespace(node, ORD)) { //TODO ord is Temporary
+                           yyerror("Varaible redefinition");
                            exit(2);
                         };
 
@@ -552,8 +561,7 @@ type_specifier: VOID {$$ = make_default_type(T_VOID);}
                    exit(1);
               }
               | struct_or_union_specifier{
-                   yyerror("UNIMPLEMNTED");
-                   exit(1);
+                $$ = $1;
               }
               | enum_specifier{
                    yyerror("UNIMPLEMNTED");
@@ -566,36 +574,109 @@ type_specifier: VOID {$$ = make_default_type(T_VOID);}
               ;
 
 // 6.7.2.1
-struct_or_union_specifier: struct_or_union IDENT '{' struct_declaration_list '}' // Optional
-                         | struct_or_union '{' struct_declaration_list '}'
-                         | struct_or_union IDENT
-                         ;
+struct_or_union_specifier: struct_or_union IDENT '{' {create_scope();} struct_declaration_list '}' {
+                            struct SymbolTable * members = shallow_pop_table();
+                            struct SymbolTableNode n = make_st_node($2.str, TAGS, TAG, 0, make_struct_or_union($1, members), NULL);
+                            if(!enter_in_namespace(n, TAGS)) {
+                                fprintf(stderr, "Struct Or Union Tag Redefinition");
+                                exit(2);
+                            };
+                            $$ = n.val.type;
+                         }// Optional
+                         | struct_or_union {create_scope();}'{' struct_declaration_list '}' {
+                            struct SymbolTable * members = shallow_pop_table();
+                            struct SymbolTableNode n = make_st_node(NULL, TAGS, TAG, 0, make_struct_or_union($1, members), NULL);
+                            if(!enter_in_namespace(n, TAGS)) {
+                                fprintf(stderr, "Struct Or Union Tag Redefinition");
+                                exit(2);
+                            };
+                            $$ = n.val.type;
+                         }
+                         | struct_or_union IDENT {
+                            struct SymbolTableNode n;
+                            if (!find_in_namespace($2.str, TAGS, &n)) {
+                                n = make_st_node($2.str, TAGS, TAG, 0, make_struct_or_union($1, NULL), NULL);
+                                enter_in_namespace(n, TAGS); // Should always pass since I checked before
+                            }
+                            $$ = n.val.type;
+                        }
+                        ;
 
-struct_or_union: STRUCT
-               | UNION
+struct_or_union: STRUCT {$$ = 1;}
+               | UNION {$$ = 0;}
                ;
 
-struct_declaration_list: struct_declaration
-                       | struct_declaration_list struct_declaration
+struct_declaration_list: struct_declaration {$$ = NULL;}
+                       | struct_declaration_list struct_declaration {$$ = NULL;}
                        ;
-struct_declaration: specifier_qualifer_list struct_declarator_list ';' // Optional
-                  | specifier_qualifer_list ';'
-                  | static_assert_decleration
+struct_declaration: specifier_qualifer_list struct_declarator_list ';' {$$ = NULL;}// Optional
+                  | specifier_qualifer_list ';' {fprintf(stderr, "UNIMPLEMNTED"); exit(1);}
+                  | static_assert_decleration  {fprintf(stderr, "UNIMPLEMNTED"); exit(1);}
                   ;
 
-specifier_qualifer_list: type_specifier specifier_qualifer_list // Optional
-                       | type_specifier
-                       | type_qualifier specifier_qualifer_list // Optional
-                       | type_qualifier // Optional
+specifier_qualifer_list: type_specifier specifier_qualifer_list {
+                        $$ = $2;
+                        get_last_from_next($$)->extentions.next_type.next = $1;
+                       }// Optional
+                       | type_specifier {
+                        $$ = $1;
+                       }
+                       | type_qualifier specifier_qualifer_list {
+                        $2->qualifier_bit_mask |= $1;
+                        $$ = $2;
+                       }// Optional
+                       | type_qualifier {
+                        struct Type * t = make_default_type(0);
+                        t->qualifier_bit_mask = $1;
+                        $$ = t;
+                       } // Optional
                        ;
 
-struct_declarator_list: struct_declarator
-                      | struct_declarator_list ',' struct_declarator
+struct_declarator_list: struct_declarator {
+                          if($1.val.type == NULL) {
+                            $1.val.type = $<type>0;
+                          } else {
+                              print_type($1.val.type);
+                              printf("\n");
+                              $1.val.type = reverse_next($1.val.type);
+                              struct Type * t = get_last_from_next($1.val.type);
+                              if (t->type == T_FUNC) {
+                                if(t->extentions.func.ret == NULL) {
+                                    t->extentions.func.ret = $<type>0;
+                                } else {
+                                    t->extentions.func.ret = reverse_next(t->extentions.func.ret);
+                                    t->extentions.func.ret = t->extentions.func.ret->extentions.next_type.next = $<type>0;
+                                }
+                              }
+                              t->extentions.next_type.next = $<type>0;
+                          }
+                          enter_in_namespace($1, MEMS);
+                          $$ = $1;
+                      }
+                      | struct_declarator_list ',' struct_declarator {
+                          if($3.val.type == NULL) {
+                            $3.val.type = $1.val.type;
+                          } else {
+                              $3.val.type = reverse_next($3.val.type);
+                              struct Type * t = get_last_from_next($3.val.type);
+                              if (t->type == T_FUNC) {
+                                if(t->extentions.func.ret == NULL) {
+                                    t->extentions.func.ret = $1.val.type;
+                                } else {
+                                    t->extentions.func.ret = reverse_next(t->extentions.func.ret);
+                                    t->extentions.func.ret = t->extentions.func.ret->extentions.next_type.next = $1.val.type;
+                                }
+                              }
+                              t->extentions.next_type.next = $1.val.type;
+                          }
+                          enter_in_namespace($3, MEMS);
+                          $$ = $3;
+                      }
                       ;
 
-struct_declarator: declarator
-                 | declarator ':' constant_expression // Optional
-                 | ':' constant_expression // Optional
+struct_declarator: declarator {if($1.val.type != NULL && $1.val.type->type == T_FUNC) {fprintf(stderr, "No Function members\n"); exit(2);} $$ = $1;}
+                 | declarator ':' constant_expression {fprintf(stderr, "UNIMPLEMNTED"); exit(1);}// Optional
+                 | ':' constant_expression {fprintf(stderr, "UNIMPLEMNTED"); exit(1);}// Optional
                  ;
 
 // 6.7.2.2
@@ -643,25 +724,24 @@ alignment_specifier: _ALIGNAS '(' type_name ')' {
 
 // 6.7.6
 declarator: pointer direct_declarator {
-           /* $1 = reverse_and_merge($2.val.type, $1); */
-           /* $2.val.type = $1; */
-           /* $$ = $2; */
-           $2.val.type = reverse_next($2.val.type);
-           $1 = reverse_next($1);
-           struct Type * last = get_last_from_next($2.val.type);
-           if (last->type == T_FUNC) {
-            last->extentions.func.ret = $1;
-           } else {
-            last->extentions.next_type.next = $1;
-           }
-           printf("pre: ");
-           print_type($2.val.type);
-           printf("\n");
-           $$ = $2;
+          if($2.val.type != NULL) {
+            struct Type * t = $2.val.type->type == T_FUNC ? $2.val.type : get_last_from_next($2.val.type);
+            if (t->type == T_FUNC) {
+                t->extentions.func.ret = $1;
+                $$ = $2;
+            } else {
+             get_last_from_next($1)->extentions.next_type.next = $2.val.type;
+             $2.val.type = $1;
+             $$ = $2;
+            }
+          } else {
+             get_last_from_next($1)->extentions.next_type.next = $2.val.type;
+             $2.val.type = $1;
+             $$ = $2;
+          }
           }
           | direct_declarator {
            $$ = $1;
-           $$.val.type = reverse_next($$.val.type);
           }
           ;
 
@@ -727,8 +807,6 @@ direct_declarator: IDENT {
                         last->extentions.next_type.next = t;
                         t = $1.val.type;
                     }
-                    print_type(t);
-                    printf("\n");
                     $1.val.type = t;
                     pop_symbol_table();
                     $$ = $1;
@@ -786,12 +864,6 @@ parameter_declaration: declaration_specifiers declarator {
 
 
                        $$ = make_st_node($2.name, ORD, VARIABLE, $1.val.sc, merge_if_next($2.val.type,$1.val.type), NULL);
-                       /* struct SymbolTableNode n; */
-                       /* n.val.type = merge_if_next($2.val.type,$1.val.type); */
-                       /* n.name = $2.name; */
-                       /* n.type = VARIABLE; */
-                       /* n.val.sc = $1.val.sc; */
-                       /* $$ = n; */
                      }
                      | declaration_specifiers abstract_declarator {
                         fprintf(stderr, "UNIMPLEMNTED");

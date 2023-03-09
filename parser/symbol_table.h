@@ -43,8 +43,10 @@ struct SymbolTable *initalize_table(size_t capacity);
 
 void create_scope();
 
-int find_in_namespace(char *name, enum Namespace namespc);
+int find_in_namespace(char *name, enum Namespace namespc,
+                      struct SymbolTableNode *output);
 
 int enter_in_namespace(struct SymbolTableNode node, enum Namespace namespc);
 
 void pop_symbol_table();
+struct SymbolTable *shallow_pop_table();

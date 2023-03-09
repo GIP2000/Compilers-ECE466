@@ -17,6 +17,12 @@ struct SymbolTable *initalize_table(size_t capacity) {
     return symbol_table;
 }
 
+struct SymbolTable *shallow_pop_table() {
+    struct SymbolTable *old = symbol_table;
+    symbol_table = symbol_table->parent;
+    return old;
+}
+
 void pop_symbol_table() {
     if (symbol_table->parent == NULL) {
         fprintf(stderr, "Tried to pop global symbol table");
@@ -30,8 +36,9 @@ void pop_symbol_table() {
     }
     free(symbol_table->nodearr);
 
-    struct SymbolTable *old = symbol_table;
-    symbol_table = symbol_table->parent;
+    // struct SymbolTable *old = symbol_table;
+    // symbol_table = symbol_table->parent;
+    struct SymbolTable *old = shallow_pop_table();
     free(old);
 }
 
@@ -41,11 +48,19 @@ void create_scope() {
     symbol_table = new;
 }
 
-int find_in_table(char *name, enum Namespace namespc, struct SymbolTable *ct) {
+int find_in_table(char *name, enum Namespace namespc, struct SymbolTable *ct,
+                  struct SymbolTableNode *output) {
+    if (name == NULL) {
+        // if the name is null then It defaults to go in the symbol table since
+        // it is anonymous
+        return 1;
+    }
     size_t i;
     for (i = 0; i < ct->len; ++i) {
         if (strcmp(name, ct->nodearr[i].name) == 0 &&
             ct->nodearr[i].namespc == namespc) {
+            if (output != NULL)
+                *output = ct->nodearr[i];
             return 1;
         }
     }
@@ -54,7 +69,8 @@ int find_in_table(char *name, enum Namespace namespc, struct SymbolTable *ct) {
 
 // maybe change this to void and instead exit on error
 int enter_in_namespace(struct SymbolTableNode node, enum Namespace namespc) {
-    if (find_in_table(node.name, namespc, symbol_table)) {
+
+    if (find_in_table(node.name, namespc, symbol_table, NULL)) {
         // handle specific cases like function prototypes ...
         return 0;
     }
@@ -71,10 +87,11 @@ int enter_in_namespace(struct SymbolTableNode node, enum Namespace namespc) {
     return 1;
 }
 
-int find_in_namespace(char *name, enum Namespace namespc) {
+int find_in_namespace(char *name, enum Namespace namespc,
+                      struct SymbolTableNode *output) {
     struct SymbolTable *ct = symbol_table;
     while (ct != NULL) {
-        if (find_in_table(name, namespc, ct)) {
+        if (find_in_table(name, namespc, ct, output)) {
             return 1;
         }
         ct = ct->parent;
