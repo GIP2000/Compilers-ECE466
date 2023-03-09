@@ -46,6 +46,7 @@ struct Type {
         struct {
             int function_spec_bit_mask;
             struct Type *ret;
+            struct AstNode *statment;
 
             size_t arg_count;
             int has_variable_args;

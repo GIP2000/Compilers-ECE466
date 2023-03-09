@@ -860,7 +860,7 @@ static_assert_decleration: _STATIC_ASSERT '(' constant_expression ',' STRING ')'
 // 6.8
 statment: labeled_statment
         | declaration
-        /* | compound_statment TODO PUT BACK AFTER TESTING*/
+        | compound_statment
         | expression_statment
         | selection_statment
         | iteration_statment
@@ -932,8 +932,14 @@ external_declaration: function_definition
                     | declaration
                     ;
 // 6.9.1
-function_definition: declaration_specifiers declarator declaration_list compound_statment // Optional
-                   | declaration_specifiers declarator compound_statment
+function_definition: declaration_specifiers declarator declaration_list compound_statment {
+                    yyerror("K&R Not Supported");
+                    exit(2);
+                 }// Optional
+                   | declaration_specifiers declarator compound_statment {
+                    // find in symbol table and attach compound_statment
+                    // or enter in namespace
+                   }
                    ;
 
 declaration_list: declaration
