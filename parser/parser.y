@@ -116,11 +116,8 @@
 %type <num> CHARLIT
 
 
-//%start translation_unit
+%start translation_unit
 %%
-
-start: statment  {print_AstNode($1, 0);}
-     | start statment {print_AstNode($2, 0);}
 
 // Notes:
 // Temporary start for assignemnt one
@@ -874,8 +871,9 @@ labeled_statment: IDENT ':' statment
                 ;
 
 // 6.8.2
-compound_statment: '{' block_item_list '}' { // Optional
-                    $$ = $2;
+compound_statment: '{' {create_scope();} block_item_list '}' { // Optional
+                    $$ = $3;
+                    shallow_pop_table();
                  }
                  | '{' '}' {$$ = NULL;}
                  ;
@@ -937,8 +935,26 @@ function_definition: declaration_specifiers declarator declaration_list compound
                     exit(2);
                  }// Optional
                    | declaration_specifiers declarator compound_statment {
+                    struct Type *t = add_to_end_and_reverse($2.val.type, $1.val.type);
+                    if (t->type != T_FUNC || $2.namespc != ORD) {
+                        yyerror("Invalid Funciton Definiton");
+                        exit(2);
+                    }
+                    struct SymbolTableNode current_node = make_st_node($2.name, $2.namespc, $2.type, $1.val.sc,t, NULL);
                     // find in symbol table and attach compound_statment
                     // or enter in namespace
+                    struct SymbolTableNode old_node;
+                    int found;
+                    if((found = find_in_namespace($2.name, ORD, &old_node)) && func_is_comp(old_node.val.type, current_node.val.type)) {
+                        old_node.val.type->extentions.func.statment = $3;
+                    } else if (!found) {
+                        current_node.val.type->extentions.func.statment = $3;
+                        enter_in_namespace(current_node, ORD);
+                    } else {
+                        yyerror("funciton signature is not compatible");
+                        exit(2);
+                    }
+
                    }
                    ;
 

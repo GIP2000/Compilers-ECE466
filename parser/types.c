@@ -5,6 +5,7 @@
 
 extern void yyerror(char *);
 
+int func_is_comp(struct Type *old_node, struct Type *current_node) { return 0; }
 struct Type *add_to_end_and_reverse(struct Type *source, struct Type *end) {
     if (end == NULL) {
         return source;
@@ -124,6 +125,7 @@ struct Type *make_func_type(struct Type *ret, struct SymbolTable *pt,
                             int has_variable_args) {
     struct Type *type_obj = make_default_type(T_FUNC);
     type_obj->extentions.func.has_variable_args = has_variable_args;
+    type_obj->extentions.func.statment = NULL;
     type_obj->extentions.func.ret = ret != NULL ? clone_type(ret) : NULL;
     if (pt == NULL) {
         type_obj->extentions.func.arg_count = 0;

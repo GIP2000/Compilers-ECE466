@@ -59,6 +59,8 @@ struct Type {
     } extentions;
 };
 
+int func_is_comp(struct Type *f1, struct Type *f2);
+
 void print_type(struct Type *type);
 
 struct Type *merge_if_next(struct Type *parent, struct Type *chlid);
