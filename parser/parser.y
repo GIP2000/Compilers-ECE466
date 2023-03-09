@@ -441,32 +441,6 @@ declaration_specifiers: storage_class_specifier declaration_specifiers {
 
 init_declarator_list: init_declarator {
                     struct Type *t = add_to_end_and_reverse($1.val.type, $<current_symbol>0.val.type);
-                    /*     struct Type * t; */
-                    /*     if ($1.val.type == NULL) { */
-                    /*         t = $<current_symbol>0.val.type; */
-                    /*     } else if ($1.val.type->type == T_FUNC) { */
-                    /*         t = $1.val.type; */
-                    /*         if(t->extentions.func.ret == NULL) */
-                    /*             t->extentions.func.ret = $<current_symbol>0.val.type; */
-                    /*         else { */
-                    /*             $1.val.type->extentions.func.ret = reverse_next(t->extentions.func.ret); */
-                    /*             t = $1.val.type; */
-                    /*             get_last_from_next(t->extentions.func.ret)->extentions.next_type.next = $<current_symbol>0.val.type; */
-                    /*         } */
-                    /*     } else { */
-                    /*         t = reverse_next($1.val.type); */
-                    /*         $1.val.type = t; */
-                    /*         struct Type * start = get_last_from_next(t); */
-                    /*         if (start->type == T_FUNC) { */
-                    /*             if(start->extentions.func.ret == NULL) */
-                    /*                 start->extentions.func.ret = $<current_symbol>0.val.type; */
-                    /*             else { */
-                    /*                 start->extentions.func.ret = reverse_next(start->extentions.func.ret); */
-                    /*                 get_last_from_next(start->extentions.func.ret)->extentions.next_type.next = $<current_symbol>0.val.type; */
-                    /*             } */
-                    /*         } */
-                    /*         else start->extentions.next_type.next = $<current_symbol>0.val.type; */
-                    /*     } */
                         struct SymbolTableNode n = make_st_node($1.name, $1.namespc, $1.type, $<current_symbol>0.val.sc, t,$1.val.initalizer);
                         /* // TODO fill in IDENT TYPE */
                         if(!enter_in_namespace(n, ORD)) { //TODO ord is Temporary
@@ -480,33 +454,7 @@ init_declarator_list: init_declarator {
                     | init_declarator_list ',' init_declarator {
                         struct SymbolTableNode *n = $1->statments.head->node->declaration.symbol;
                         struct Type * t = add_to_end_and_reverse($3.val.type, n->val.type);
-                        /* if ($3.val.type == NULL) { */
-                        /*     t = n->val.type; */
-                        /* } else if ($3.val.type->type == T_FUNC) { */
-                        /*     t = $3.val.type; */
-                        /*     if(t->extentions.func.ret == NULL) */
-                        /*         t->extentions.func.ret = n->val.type; */
-                        /*     else { */
-                        /*         $3.val.type->extentions.func.ret = reverse_next(t->extentions.func.ret); */
-                        /*         t = $3.val.type; */
-                        /*         get_last_from_next(t->extentions.func.ret)->extentions.next_type.next = n->val.type; */
-                        /*     } */
-                        /* } else { */
-                        /*     t = reverse_next($3.val.type); */
-                        /*     $3.val.type = t; */
-                        /*     struct Type * start = get_last_from_next(t); */
-                        /*     if (start->type == T_FUNC) { */
-                        /*         if(start->extentions.func.ret == NULL) */
-                        /*             start->extentions.func.ret = n->val.type; */
-                        /*         else { */
-                        /*             start->extentions.func.ret = reverse_next(start->extentions.func.ret); */
-                        /*             get_last_from_next(start->extentions.func.ret)->extentions.next_type.next = n->val.type; */
-                        /*         } */
-                        /*     } */
-                        /*     else start->extentions.next_type.next = n->val.type; */
-                        /* } */
                         struct SymbolTableNode node = make_st_node($3.name, $3.namespc, $3.type, n->val.sc, t,$3.val.initalizer);
-                        /* // TODO fill in IDENT TYPE */
                         if(!enter_in_namespace(node, ORD)) { //TODO ord is Temporary
                            yyerror("Varaible redefinition");
                            exit(2);
@@ -634,42 +582,14 @@ specifier_qualifer_list: type_specifier specifier_qualifer_list {
                        ;
 
 struct_declarator_list: struct_declarator {
-                          if($1.val.type == NULL) {
-                            $1.val.type = $<type>0;
-                          } else {
-                              print_type($1.val.type);
-                              printf("\n");
-                              $1.val.type = reverse_next($1.val.type);
-                              struct Type * t = get_last_from_next($1.val.type);
-                              if (t->type == T_FUNC) {
-                                if(t->extentions.func.ret == NULL) {
-                                    t->extentions.func.ret = $<type>0;
-                                } else {
-                                    t->extentions.func.ret = reverse_next(t->extentions.func.ret);
-                                    t->extentions.func.ret = t->extentions.func.ret->extentions.next_type.next = $<type>0;
-                                }
-                              }
-                              t->extentions.next_type.next = $<type>0;
-                          }
+                            struct Type * t = add_to_end_and_reverse($1.val.type, $<type>0);
+                            $1.val.type = t;
                           enter_in_namespace($1, MEMS);
                           $$ = $1;
                       }
                       | struct_declarator_list ',' struct_declarator {
-                          if($3.val.type == NULL) {
-                            $3.val.type = $1.val.type;
-                          } else {
-                              $3.val.type = reverse_next($3.val.type);
-                              struct Type * t = get_last_from_next($3.val.type);
-                              if (t->type == T_FUNC) {
-                                if(t->extentions.func.ret == NULL) {
-                                    t->extentions.func.ret = $1.val.type;
-                                } else {
-                                    t->extentions.func.ret = reverse_next(t->extentions.func.ret);
-                                    t->extentions.func.ret = t->extentions.func.ret->extentions.next_type.next = $1.val.type;
-                                }
-                              }
-                              t->extentions.next_type.next = $1.val.type;
-                          }
+                          struct Type * t = add_to_end_and_reverse($3.val.type, $1.val.type);
+                          $3.val.type = t;
                           enter_in_namespace($3, MEMS);
                           $$ = $3;
                       }
