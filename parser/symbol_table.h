@@ -2,6 +2,8 @@
 #include <stdlib.h>
 enum IdentType { VARIABLE, FUNCTION, TYPEDEFNAME, TAG, LABELNAME, MEMBER };
 
+enum SymbolTableType { GLOBAL, FUNC, PROTOTYPE, STRUCT_OR_UNION };
+
 enum StorageClass {
     S_AUTO,
     S_EXTERN,
