@@ -5,7 +5,72 @@
 
 extern void yyerror(char *);
 
-int func_is_comp(struct Type *old_node, struct Type *current_node) { return 0; }
+int types_eq(struct Type *t1, struct Type *t2) {
+    if (t1->type != t2->type) {
+        return 0;
+    }
+
+    if (t1->type == T_ARR && t1->extentions.next_type.arr_size_expression !=
+                                 t2->extentions.next_type.arr_size_expression) {
+        return 0;
+    }
+
+    if (t1->type >= T_POINTER && t1->type <= T_TYPEDEF) {
+        return types_eq(t1->extentions.next_type.next,
+                        t2->extentions.next_type.next);
+    }
+
+    if (t1->type == T_FUNC) {
+        if (t1->extentions.func.arg_count != t2->extentions.func.arg_count ||
+            t1->extentions.func.has_variable_args !=
+                t2->extentions.func.has_variable_args ||
+            !types_eq(t1->extentions.func.ret, t2->extentions.func.ret))
+            return 0;
+
+        size_t i;
+        for (i = 0; i < t1->extentions.func.arg_count; ++i) {
+            if (!types_eq(&t1->extentions.func.args[i],
+                          &t2->extentions.func.args[i]))
+                return 0;
+        }
+        return 1;
+    }
+    if (t1->type == T_STRUCT || t1->type == T_UNION) {
+        if (t1->extentions.st_un.is_struct != t2->extentions.st_un.is_struct ||
+            t1->extentions.st_un.mem->len != t2->extentions.st_un.mem->len)
+            return 0;
+        size_t i;
+        for (i = 0; i < t1->extentions.st_un.mem->len; ++i) {
+            if (t1->extentions.st_un.mem->nodearr[i].val.sc !=
+                    t2->extentions.st_un.mem->nodearr[i].val.sc ||
+                !types_eq(t1->extentions.st_un.mem->nodearr[i].val.type,
+                          t2->extentions.st_un.mem->nodearr[i].val.type))
+                return 0;
+            ;
+        }
+        return 1;
+    }
+    return 1;
+}
+
+int func_is_comp(struct Type *old_node, struct Type *current_node) {
+    // This does not follow the exact rules, it just makes sure they are exactly
+    // equal but allows f() -> f(details)
+    if (old_node->extentions.func.statment != NULL) {
+        return 0;
+    }
+    if (old_node->extentions.func.args == NULL &&
+        old_node->extentions.func.has_variable_args ==
+            current_node->extentions.func.has_variable_args &&
+        types_eq(old_node->extentions.func.ret,
+                 current_node->extentions.func.ret)) {
+        old_node->extentions.func.args = current_node->extentions.func.args;
+        old_node->extentions.func.arg_count =
+            current_node->extentions.func.arg_count;
+    }
+
+    return types_eq(old_node, current_node);
+}
 struct Type *add_to_end_and_reverse(struct Type *source, struct Type *end) {
     if (end == NULL) {
         return source;

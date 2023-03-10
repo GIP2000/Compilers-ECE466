@@ -59,7 +59,7 @@ struct Type {
     } extentions;
 };
 
-int func_is_comp(struct Type *f1, struct Type *f2);
+int func_is_comp(struct Type *old_node, struct Type *current_node);
 
 void print_type(struct Type *type);
 

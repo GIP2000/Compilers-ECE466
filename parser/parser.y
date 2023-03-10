@@ -402,7 +402,8 @@ declaration_specifiers: storage_class_specifier declaration_specifiers {
                        $$ = make_st_node(NULL, 0, 0, $1, NULL, NULL);
                       }
                       | type_specifier declaration_specifiers {
-                        add_or_throw_type($2.val.type, $1);
+                        $1->extentions.next_type.next = $2.val.type;
+                        $2.val.type = $1;
                         $$ = $2;
                       }// Optional
                       | type_specifier {

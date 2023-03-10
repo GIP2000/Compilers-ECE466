@@ -16,7 +16,9 @@ struct SymbolTable *symbol_table;
 void print_output() {
     size_t i;
     for (i = 0; i < symbol_table->len; ++i) {
-        printf("name: %s type: ", symbol_table->nodearr[i].name);
+        if (symbol_table->nodearr[i].type != 0)
+            continue;
+        printf("name: %s type ", symbol_table->nodearr[i].name);
         print_type(symbol_table->nodearr[i].val.type);
         if (symbol_table->nodearr[i].val.type->type == T_FUNC) {
             printf("{\n");
@@ -62,6 +64,7 @@ int main(int argc, char **argv) {
         if (ret != 0) {
             return ret;
         }
+        print_output();
     }
     return 0;
 }

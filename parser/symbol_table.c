@@ -74,11 +74,16 @@ int enter_in_namespace(struct SymbolTableNode node, enum Namespace namespc) {
         // handle specific cases like function prototypes ...
         return 0;
     }
+    // fprintf(stderr, "before -> cap: %ld , len: %ld add: %p\n",
+    //         (long)(symbol_table->capacity), (long)(symbol_table->len),
+    //         symbol_table->nodearr);
 
-    if (symbol_table->capacity - symbol_table->len <= 0) {
+    if ((long)symbol_table->capacity - (long)symbol_table->len <= 0) {
+        fprintf(stderr, "realloc\n");
         // look into later if I should just be doing +1
         symbol_table->nodearr =
-            realloc(symbol_table->nodearr, symbol_table->len + 10);
+            realloc(symbol_table->nodearr,
+                    sizeof(struct SymbolTableNode) * (symbol_table->len + 10));
         symbol_table->capacity = symbol_table->len + 10;
     }
 
