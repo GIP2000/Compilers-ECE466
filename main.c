@@ -65,6 +65,8 @@ int main(int argc, char **argv) {
             return ret;
         }
         print_output();
+        pop_global_table();
+        symbol_table = initalize_table(10);
     }
     return 0;
 }

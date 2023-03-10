@@ -22,13 +22,7 @@ struct SymbolTable *shallow_pop_table() {
     symbol_table = symbol_table->parent;
     return old;
 }
-
-void pop_symbol_table() {
-    if (symbol_table->parent == NULL) {
-        fprintf(stderr, "Tried to pop global symbol table");
-        exit(1);
-    }
-
+void pop_global_table() {
     size_t i;
     for (i = 0; i < symbol_table->len; ++i) {
         free(symbol_table->nodearr[i].name);
@@ -40,6 +34,14 @@ void pop_symbol_table() {
     // symbol_table = symbol_table->parent;
     struct SymbolTable *old = shallow_pop_table();
     free(old);
+}
+
+void pop_symbol_table() {
+    if (symbol_table->parent == NULL) {
+        fprintf(stderr, "Tried to pop global symbol table");
+        exit(1);
+    }
+    pop_global_table();
 }
 
 void create_scope() {
