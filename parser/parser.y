@@ -521,20 +521,22 @@ type_specifier: VOID {$$ = make_default_type(T_VOID);}
               ;
 
 // 6.7.2.1
-struct_or_union_specifier: struct_or_union IDENT '{' {create_scope();} struct_declaration_list '}' {
+struct_or_union_specifier: struct_or_union IDENT '{' {create_scope(STRUCT_OR_UNION);} struct_declaration_list '}' {
                             struct SymbolTable * members = shallow_pop_table();
                             struct SymbolTableNode n = make_st_node($2.str, TAGS, TAG, 0, make_struct_or_union($1, members), NULL);
-                            if(!enter_in_namespace(n, TAGS)) {
-                                fprintf(stderr, "Struct Or Union Tag Redefinition");
+                            if(n.name != NULL && !enter_in_namespace(n, TAGS)) {
+                                yyerror("Struct Or Union Tag Redefinition");
+                                fprintf(stderr, "name = %s\n", n.name);
                                 exit(2);
                             };
                             $$ = n.val.type;
                          }// Optional
-                         | struct_or_union {create_scope();}'{' struct_declaration_list '}' {
+                         | struct_or_union {create_scope(STRUCT_OR_UNION);}'{' struct_declaration_list '}' {
                             struct SymbolTable * members = shallow_pop_table();
                             struct SymbolTableNode n = make_st_node(NULL, TAGS, TAG, 0, make_struct_or_union($1, members), NULL);
-                            if(!enter_in_namespace(n, TAGS)) {
-                                fprintf(stderr, "Struct Or Union Tag Redefinition");
+                            if(n.name != NULL && !enter_in_namespace(n, TAGS)) {
+                                yyerror("Struct Or Union Tag Redefinition");
+                                fprintf(stderr, "name = %s\n", n.name);
                                 exit(2);
                             };
                             $$ = n.val.type;
@@ -668,7 +670,6 @@ direct_declarator: IDENT {
                     $$ = make_st_node($1.str, ORD, 0, 0, NULL, NULL);
                  }
                  | '(' declarator ')' {
-                    /* $2.val.type = reverse_next($2.val.type); */
                     $$ = $2; // Double check I interpreted this correctly
                  }
                  | direct_declarator '[' type_qualifier_list assignment_expression ']' {
@@ -719,7 +720,7 @@ direct_declarator: IDENT {
                     $$ = $1;
                  }// Optional
                  | direct_declarator '[' '*' ']' {$$ = $1;}
-                 | direct_declarator '(' {create_scope();} parameter_type_list ')'{
+                 | direct_declarator '(' {create_scope(PROTOTYPE);} parameter_type_list ')'{
                     struct Type * t = make_func_type(NULL, symbol_table, $4);
                     if ($1.val.type != NULL) {
                         struct Type * last = get_last_from_next($1.val.type);
@@ -872,7 +873,7 @@ labeled_statment: IDENT ':' statment
                 ;
 
 // 6.8.2
-compound_statment: '{' {create_scope();} block_item_list '}' { // Optional
+compound_statment: '{' {create_scope(FUNC);} block_item_list '}' { // Optional
                     $$ = $3;
                     shallow_pop_table();
                  }

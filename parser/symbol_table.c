@@ -44,19 +44,15 @@ void pop_symbol_table() {
     pop_global_table();
 }
 
-void create_scope() {
+void create_scope(enum SymbolTableType type) {
     struct SymbolTable *new = initalize_table(10);
+    new->st_type = type;
     new->parent = symbol_table;
     symbol_table = new;
 }
 
 int find_in_table(char *name, enum Namespace namespc, struct SymbolTable *ct,
                   struct SymbolTableNode *output) {
-    if (name == NULL) {
-        // if the name is null then It defaults to go in the symbol table since
-        // it is anonymous
-        return 1;
-    }
     size_t i;
     for (i = 0; i < ct->len; ++i) {
         if (strcmp(name, ct->nodearr[i].name) == 0 &&
@@ -72,13 +68,23 @@ int find_in_table(char *name, enum Namespace namespc, struct SymbolTable *ct,
 // maybe change this to void and instead exit on error
 int enter_in_namespace(struct SymbolTableNode node, enum Namespace namespc) {
 
-    if (find_in_table(node.name, namespc, symbol_table, NULL)) {
-        // handle specific cases like function prototypes ...
+    struct SymbolTable *st = symbol_table;
+
+    while (st->st_type == STRUCT_OR_UNION && namespc != MEMS) {
+        st = st->parent;
+    }
+    struct SymbolTable *symbol_table = st;
+
+    struct SymbolTableNode n;
+    if (find_in_table(node.name, namespc, symbol_table, &n)) {
+        // handle case of completing an incomplete struct
+        if (namespc == TAGS && n.val.type->extentions.st_un.mem == NULL) {
+            n.val.type->extentions.st_un.mem =
+                node.val.type->extentions.st_un.mem;
+            return 1;
+        }
         return 0;
     }
-    // fprintf(stderr, "before -> cap: %ld , len: %ld add: %p\n",
-    //         (long)(symbol_table->capacity), (long)(symbol_table->len),
-    //         symbol_table->nodearr);
 
     if ((long)symbol_table->capacity - (long)symbol_table->len <= 0) {
         fprintf(stderr, "realloc\n");

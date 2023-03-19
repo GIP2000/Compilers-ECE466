@@ -278,6 +278,9 @@ struct Type *merge_if_next(struct Type *parent, struct Type *child) {
 
 struct Type *get_last_from_next(struct Type *t) {
     struct Type *start;
+    if (t->type == T_FUNC) {
+        return get_last_from_next(t->extentions.func.ret);
+    }
     for (start = t; start->extentions.next_type.next != NULL &&
                     start->type >= T_POINTER && start->type <= T_TYPEDEF;
          start = start->extentions.next_type.next) {
@@ -300,7 +303,8 @@ struct Type *make_struct_or_union(int is_struct, struct SymbolTable *mem) {
     return t;
 }
 
-void print_type(struct Type *type) {
+void print_type_i(struct Type *type, int prev_pointer) {
+
     switch (type->type) {
 
     case T_VOID:
@@ -359,14 +363,13 @@ void print_type(struct Type *type) {
     printf(" qualifer: (%d)", type->qualifier_bit_mask);
 
     if (type->type < T_POINTER) {
-        //     printf("\n");
         return;
     }
 
     if (type->type < T_TYPEDEF) {
         printf(" -> ");
         if (type->extentions.next_type.next != NULL) {
-            print_type(type->extentions.next_type.next);
+            print_type_i(type->extentions.next_type.next, 1);
         }
         return;
     }
@@ -376,22 +379,21 @@ void print_type(struct Type *type) {
         if (type->extentions.func.ret == NULL)
             printf("Unkown");
         else
-            print_type(type->extentions.func.ret);
+            print_type_i(type->extentions.func.ret, 0);
         printf(" args: (");
         size_t i;
         for (i = 0; i < type->extentions.func.arg_count; ++i) {
-            print_type(&type->extentions.func.args[i]);
+            print_type_i(&type->extentions.func.args[i], 0);
             printf(", ");
         }
         printf(")");
     }
 
-    if (type->type == T_STRUCT) {
+    if (type->type == T_STRUCT && !prev_pointer) {
         printf(" members: (");
         size_t i;
         for (i = 0; i < type->extentions.st_un.mem->len; ++i) {
-
-            print_type(type->extentions.st_un.mem->nodearr[i].val.type);
+            print_type_i(type->extentions.st_un.mem->nodearr[i].val.type, 0);
             if (type->extentions.st_un.mem->nodearr[i].name != NULL) {
                 printf(" %s", type->extentions.st_un.mem->nodearr[i].name);
             }
@@ -400,3 +402,5 @@ void print_type(struct Type *type) {
         printf(")");
     }
 }
+
+void print_type(struct Type *type) { print_type_i(type, 0); }

@@ -2,7 +2,7 @@
 #include <stdlib.h>
 enum IdentType { VARIABLE, FUNCTION, TYPEDEFNAME, TAG, LABELNAME, MEMBER };
 
-enum SymbolTableType { GLOBAL, FUNC, PROTOTYPE, STRUCT_OR_UNION };
+enum SymbolTableType { GLOBAL = 0, FUNC, PROTOTYPE, STRUCT_OR_UNION };
 
 enum StorageClass {
     S_AUTO,
@@ -23,6 +23,7 @@ struct SymbolTable {
     size_t len;
     size_t capacity;
     struct SymbolTable *parent;
+    enum SymbolTableType st_type;
 };
 
 struct SymbolTableNode {
@@ -43,7 +44,7 @@ struct SymbolTableNode make_st_node(char *name, enum Namespace namespc,
 
 struct SymbolTable *initalize_table(size_t capacity);
 
-void create_scope();
+void create_scope(enum SymbolTableType type);
 
 int find_in_namespace(char *name, enum Namespace namespc,
                       struct SymbolTableNode *output);
