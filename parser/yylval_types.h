@@ -1,4 +1,5 @@
 #pragma once
+
 typedef enum {
     TINT,
     TLONG,

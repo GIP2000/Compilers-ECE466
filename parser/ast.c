@@ -1,5 +1,6 @@
 #include "./ast.h"
 #include "../parser.tab.h"
+#include "symbol_table.h"
 #include <ctype.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -33,6 +34,7 @@ AstNode *make_IdentNode(YYlvalStrLit val) {
     ast->ident = val.str;
     return ast;
 }
+
 AstNode *make_ternary_op(AstNode *cond, AstNode *truthy, AstNode *falsey) {
     AstNode *ast = make_AstNode(ASTNODE_TERNAYROP);
     ast->ternary_op.cond = cond;
@@ -65,12 +67,40 @@ AstNode *make_func_call(AstNode *name, struct AstNodeListNode *arguments) {
     return ast;
 }
 
+struct StatmentListNode *make_StatmentListNode(AstNode *n) {
+    struct StatmentListNode *node =
+        (struct StatmentListNode *)malloc(sizeof(struct StatmentListNode));
+    node->node = n;
+    node->next = NULL;
+    return node;
+}
+
+AstNode *make_StatementList(AstNode *node) {
+    AstNode *ast = make_AstNode(ASTNODE_STATMENTLIST);
+    struct StatmentListNode *list_node = make_StatmentListNode(node);
+    ast->statments.head = list_node;
+    ast->statments.tail = list_node;
+    return ast;
+}
+
+void append_StatmentList(struct StatmentList *statment_list,
+                         struct AstNode *next) {
+    struct StatmentListNode *list_node = make_StatmentListNode(next);
+    statment_list->tail->next = list_node;
+    statment_list->tail = list_node;
+}
+
 struct AstNodeListNode *make_node_list_node(AstNode *node) {
     struct AstNodeListNode *head =
         (struct AstNodeListNode *)malloc(sizeof(struct AstNodeListNode));
     head->val = node;
     head->next = NULL;
     return head;
+}
+AstNode *make_Declaration(struct SymbolTableNode *symbol) {
+    AstNode *ast = make_AstNode(ASTNODE_DECLARATION);
+    ast->declaration.symbol = symbol;
+    return ast;
 }
 
 struct AstNodeListNode *append_AstNodeListNode(struct AstNodeListNode *node,
@@ -195,7 +225,7 @@ void add_tab(unsigned int tab_count) {
 // print in a dfs fasion
 void print_AstNode(AstNode *head, unsigned int tab_count) {
     if (head == NULL) {
-        printf("NULL founnd\n");
+        printf("NULL found\n");
         return;
     }
     // make the tabs
@@ -255,6 +285,28 @@ void print_AstNode(AstNode *head, unsigned int tab_count) {
         }
         return;
     }
+    case ASTNODE_STATMENTLIST: {
+        printf("StatmentList: \n");
+        struct StatmentListNode *start;
+        int i;
+        for (i = 0, start = head->statments.head; start != NULL;
+             start = start->next, ++i) {
+            printf("statment #%d: \n", i);
+            print_AstNode(start->node, tab_count + 1);
+            if (start->next != NULL) {
+                add_tab(tab_count);
+            }
+        }
+        return;
+    }
+    case ASTNODE_DECLARATION:
+        printf(
+            "Decleration: %s namespace (%d) ident_type (%d) sc (%d) type: ",
+            head->declaration.symbol->name, head->declaration.symbol->namespc,
+            head->declaration.symbol->type, head->declaration.symbol->val.sc);
+        print_type(head->declaration.symbol->val.type);
+        printf("\n");
+        return;
     default:
         fprintf(stderr, "Unsuportted Node type %d\n", head->type);
         exit(1);
