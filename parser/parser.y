@@ -407,7 +407,7 @@ declaration_specifiers: storage_class_specifier declaration_specifiers {
                         $$ = $2;
                       }// Optional
                       | type_specifier {
-                        $$ = make_st_node(NULL, 0, 0, 0, $1, NULL);
+                        $$ = make_st_node(NULL, 0, 0, get_default_sc(), $1, NULL);
                       }
                       | type_qualifier declaration_specifiers {
                         $2.val.type->qualifier_bit_mask |= $1;
@@ -416,7 +416,7 @@ declaration_specifiers: storage_class_specifier declaration_specifiers {
                       | type_qualifier {
                         struct Type * t = make_default_type(0);
                         t->qualifier_bit_mask = $1;
-                        $$ = make_st_node(NULL, 0, 0, 0, t, NULL);
+                        $$ = make_st_node(NULL, 0, 0, get_default_sc(), t, NULL);
                       }
                       | function_specifier declaration_specifiers  {
                         $2.val.type->extentions.func.function_spec_bit_mask |= $1;
@@ -425,7 +425,7 @@ declaration_specifiers: storage_class_specifier declaration_specifiers {
                       | function_specifier {
                         struct Type * t = make_default_type(T_FUNC);
                         t->extentions.func.function_spec_bit_mask = $1;
-                        $$ = make_st_node(NULL, 0, 0, 0, t, NULL);
+                        $$ = make_st_node(NULL, 0, 0, get_default_sc(), t, NULL);
                       }
                       | alignment_specifier declaration_specifiers {
                           yyerror("UNIMPLEMNTED");
@@ -667,7 +667,7 @@ declarator: pointer direct_declarator {
           ;
 
 direct_declarator: IDENT {
-                    $$ = make_st_node($1.str, ORD, 0, 0, NULL, NULL);
+                    $$ = make_st_node($1.str, ORD, 0, get_default_sc(), NULL, NULL);
                  }
                  | '(' declarator ')' {
                     $$ = $2; // Double check I interpreted this correctly

@@ -112,6 +112,13 @@ int find_in_namespace(char *name, enum Namespace namespc,
     return 0;
 }
 
+enum StorageClass get_default_sc() {
+    if (symbol_table->st_type == GLOBAL) {
+        return S_STATIC;
+    }
+    return S_AUTO;
+}
+
 struct SymbolTableNode make_st_node(char *name, enum Namespace namespc,
                                     enum IdentType ident_type,
                                     enum StorageClass sc, struct Type *type,

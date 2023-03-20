@@ -42,6 +42,8 @@ struct SymbolTableNode make_st_node(char *name, enum Namespace namespc,
                                     enum StorageClass sc, struct Type *type,
                                     struct AstNode *initalizer);
 
+enum StorageClass get_default_sc();
+
 struct SymbolTable *initalize_table(size_t capacity);
 
 void create_scope(enum SymbolTableType type);
