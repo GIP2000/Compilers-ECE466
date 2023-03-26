@@ -21,7 +21,8 @@ void print_output() {
     for (i = 0; i < symbol_table->len; ++i) {
         if (symbol_table->nodearr[i].type != 0)
             continue;
-        printf("name: %s type ", symbol_table->nodearr[i].name);
+        printf("name: %s, storage_class: %d, type ",
+               symbol_table->nodearr[i].name, symbol_table->nodearr[i].val.sc);
         print_type(symbol_table->nodearr[i].val.type);
         if (symbol_table->nodearr[i].val.type->type == T_FUNC) {
             printf("{\n");

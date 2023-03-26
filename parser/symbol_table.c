@@ -53,6 +53,9 @@ void create_scope(enum SymbolTableType type) {
 
 int find_in_table(char *name, enum Namespace namespc, struct SymbolTable *ct,
                   struct SymbolTableNode *output) {
+    if (name == NULL) {
+        return 0;
+    }
     size_t i;
     for (i = 0; i < ct->len; ++i) {
         if (strcmp(name, ct->nodearr[i].name) == 0 &&

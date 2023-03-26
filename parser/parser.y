@@ -101,7 +101,7 @@
 
 %type <arg_expression_list> argument_expression_list
 %type <storage_class> storage_class_specifier
-%type <current_symbol> declaration_specifiers direct_declarator declarator init_declarator parameter_declaration struct_declarator struct_declarator_list
+%type <current_symbol> declaration_specifiers direct_abstract_declarator direct_declarator abstract_declarator declarator init_declarator parameter_declaration struct_declarator struct_declarator_list
 %type <type> type_specifier pointer struct_or_union_specifier specifier_qualifer_list
 %type <type_qualifier> type_qualifier type_qualifier_list
 %type <function_specifier> function_specifier
@@ -694,32 +694,41 @@ direct_declarator: IDENT {
                     $$ = $1;
                  }
                  | direct_declarator '[' STATIC type_qualifier_list assignment_expression']' {
-                    $1.val.sc = S_STATIC;
-                    $1.val.type = make_next_type(T_ARR, $1.val.type);
-                    $1.val.type->qualifier_bit_mask = $4;
-                    $1.val.type->extentions.next_type.arr_size_expression = $5;
-                    $$ = $1;
+                     fprintf(stderr, "UNIMPLEMNTED");
+                     exit(1);
+                    /* $1.val.sc = S_STATIC; */
+                    /* $1.val.type = make_next_type(T_ARR, $1.val.type); */
+                    /* $1.val.type->qualifier_bit_mask = $4; */
+                    /* $1.val.type->extentions.next_type.arr_size_expression = $5; */
+                    /* $$ = $1; */
                  } // Optional
                  | direct_declarator '[' STATIC assignment_expression']' {
-                    $1.val.sc = S_STATIC;
-                    $1.val.type = make_next_type(T_ARR, $1.val.type);
-                    $1.val.type->extentions.next_type.arr_size_expression = $4;
-                    $$ = $1;
+                     fprintf(stderr, "UNIMPLEMNTED");
+                     exit(1);
+                    /* $1.val.sc = S_STATIC; */
+                    /* $1.val.type = make_next_type(T_ARR, $1.val.type); */
+                    /* $1.val.type->extentions.next_type.arr_size_expression = $4; */
+                    /* $$ = $1; */
 
                  }
                  | direct_declarator '[' type_qualifier_list STATIC assignment_expression']' {
-                    $1.val.sc = S_STATIC;
-                    $1.val.type = make_next_type(T_ARR, $1.val.type);
-                    $1.val.type->qualifier_bit_mask = $3;
-                    $1.val.type->extentions.next_type.arr_size_expression = $5;
-                    $$ = $1;
+                     fprintf(stderr, "UNIMPLEMNTED");
+                     exit(1);
+                    /* $1.val.sc = S_STATIC; */
+                    /* $1.val.type = make_next_type(T_ARR, $1.val.type); */
+                    /* $1.val.type->qualifier_bit_mask = $3; */
+                    /* $1.val.type->extentions.next_type.arr_size_expression = $5; */
+                    /* $$ = $1; */
                  }
                  | direct_declarator '[' type_qualifier_list '*' ']'  {
                     $1.val.type = make_next_type(T_ARR, $1.val.type);
                     $1.val.type->qualifier_bit_mask = $3;
                     $$ = $1;
                  }// Optional
-                 | direct_declarator '[' '*' ']' {$$ = $1;}
+                 | direct_declarator '[' '*' ']' {
+                    $$ = $1;
+                    $1.val.type = make_next_type(T_ARR, $1.val.type);
+                 }
                  | direct_declarator '(' {create_scope(PROTOTYPE);} parameter_type_list ')'{
                     struct Type * t = make_func_type(NULL, symbol_table, $4);
                     if ($1.val.type != NULL) {
@@ -785,8 +794,8 @@ parameter_declaration: declaration_specifiers declarator {
                        $$ = make_st_node($2.name, ORD, VARIABLE, $1.val.sc, t, NULL);
                      }
                      | declaration_specifiers abstract_declarator {
-                        fprintf(stderr, "UNIMPLEMNTED");
-                        exit(1);
+                       struct Type * t = add_to_end_and_reverse($2.val.type, $1.val.type);
+                       $$ = make_st_node(NULL, ORD, VARIABLE, $1.val.sc, t, NULL);
                      }// Optional
                      | declaration_specifiers
                      ;
@@ -800,32 +809,128 @@ type_name: specifier_qualifer_list abstract_declarator // Optional
          | specifier_qualifer_list
          ;
 
-abstract_declarator: pointer
-                   | pointer direct_abstract_declarator // Optional
-                   | direct_abstract_declarator
+abstract_declarator: pointer {
+                             fprintf(stderr, "UNIMPLEMNTED");
+                             exit(1);
+                   }
+                   | pointer direct_abstract_declarator {
+
+                      if($2.val.type != NULL) {
+                        struct Type * t = $2.val.type->type == T_FUNC ? $2.val.type : get_last_from_next($2.val.type);
+                        if (t->type == T_FUNC) {
+                            t->extentions.func.ret = $1;
+                            $$ = $2;
+                        } else {
+                         get_last_from_next($1)->extentions.next_type.next = $2.val.type;
+                         $2.val.type = $1;
+                         $$ = $2;
+                        }
+                      } else {
+                         get_last_from_next($1)->extentions.next_type.next = $2.val.type;
+                         $2.val.type = $1;
+                         $$ = $2;
+                      }
+                   }// Optional
+                   | direct_abstract_declarator {
+                       $$ = $1;
+                   }
                    ;
 
-direct_abstract_declarator: '(' abstract_declarator ')'
-                          | direct_abstract_declarator '[' type_qualifier_list assignment_expression ']' // Triple Optional
-                          | '[' ']'
-                          | '[' type_qualifier_list  ']'
-                          | '[' assignment_expression ']'
-                          | direct_abstract_declarator '[' ']'
-                          | direct_abstract_declarator '[' type_qualifier_list  ']'
-                          | direct_abstract_declarator '['  assignment_expression ']'
-                          |  '[' type_qualifier_list assignment_expression ']'
-                          | direct_abstract_declarator '[' STATIC type_qualifier_list assignment_expression ']' // Double Optional
-                          | '[' STATIC  assignment_expression ']'
-                          | direct_abstract_declarator '[' STATIC assignment_expression ']'
-                          |  '[' STATIC type_qualifier_list assignment_expression ']'
-                          | direct_abstract_declarator '[' type_qualifier_list STATIC assignment_expression ']' // Optional
-                          |  '[' type_qualifier_list STATIC assignment_expression ']'
-                          | direct_abstract_declarator '[' '*' ']' // Optional
-                          |  '[' '*' ']'
-                          | direct_abstract_declarator '(' parameter_type_list ')'  // Double Optional
-                          | direct_abstract_declarator '(' ')'
-                          |  '(' parameter_type_list ')'
-                          | '(' ')'
+direct_abstract_declarator: '(' abstract_declarator ')' {$$ = $2;}
+                          | direct_abstract_declarator '[' type_qualifier_list assignment_expression ']' {
+
+                            $1.val.type = make_next_type(T_ARR, $1.val.type);
+                            $1.val.type->qualifier_bit_mask = $3;
+                            /* $1.val.type = merge_if_next($1.val.type, make_next_type(T_ARR, NULL)); */
+                            $1.val.type->extentions.next_type.arr_size_expression = $4;
+                            $$ = $1;
+                          }// Triple Optional
+                          | '[' ']' {
+                             fprintf(stderr, "UNIMPLEMNTED");
+                             exit(1);
+                          }
+                          | '[' type_qualifier_list  ']'{
+                             fprintf(stderr, "UNIMPLEMNTED");
+                             exit(1);
+                          }
+                          | '[' assignment_expression ']'{
+                             fprintf(stderr, "UNIMPLEMNTED");
+                             exit(1);
+                          }
+                          | direct_abstract_declarator '[' ']' {
+                             $1.val.type = make_next_type(T_ARR, $1.val.type);
+                             $$ = $1;
+                          }
+                          | direct_abstract_declarator '[' type_qualifier_list  ']' {
+                    $1.val.type = make_next_type(T_ARR, $1.val.type);
+                    $1.val.type->qualifier_bit_mask = $3;
+                    $$ = $1;
+                 }
+                          | direct_abstract_declarator '['  assignment_expression ']'{
+                    /* $1.val.type = merge_if_next($1.val.type, make_next_type(T_ARR, NULL)); */
+                    $1.val.type = make_next_type(T_ARR, $1.val.type);
+                    $$ = $1;
+                 }
+                          |  '[' type_qualifier_list assignment_expression ']'{
+                             fprintf(stderr, "UNIMPLEMNTED");
+                             exit(1);
+                          }
+                          | direct_abstract_declarator '[' STATIC type_qualifier_list assignment_expression ']' {
+                             fprintf(stderr, "UNIMPLEMNTED");
+                             exit(1);
+                          }// Double Optional
+                          | '[' STATIC  assignment_expression ']' {
+                             fprintf(stderr, "UNIMPLEMNTED");
+                             exit(1);
+                          }
+                          | direct_abstract_declarator '[' STATIC assignment_expression ']' {
+                             fprintf(stderr, "UNIMPLEMNTED");
+                             exit(1);
+                          }
+                          |  '[' STATIC type_qualifier_list assignment_expression ']' {
+                             fprintf(stderr, "UNIMPLEMNTED");
+                             exit(1);
+                          }
+                          | direct_abstract_declarator '[' type_qualifier_list STATIC assignment_expression ']'  {
+                             fprintf(stderr, "UNIMPLEMNTED");
+                             exit(1);
+                          }// Optional
+                          |  '[' type_qualifier_list STATIC assignment_expression ']' {
+                             fprintf(stderr, "UNIMPLEMNTED");
+                             exit(1);
+                          }
+                          | direct_abstract_declarator '[' '*' ']' {
+
+                            $1.val.type = make_next_type(T_ARR, $1.val.type);
+                            $$ = $1;
+                          }// Optional
+                          |  '[' '*' ']' {
+                             fprintf(stderr, "UNIMPLEMNTED");
+                             exit(1);
+                          }
+                          | direct_abstract_declarator '(' {create_scope(PROTOTYPE);}parameter_type_list ')'  {
+                            struct Type * t = make_func_type(NULL, symbol_table, $4);
+                            if ($1.val.type != NULL) {
+                                struct Type * last = get_last_from_next($1.val.type);
+                                last->extentions.next_type.next = t;
+                                t = $1.val.type;
+                            }
+                            $1.val.type = t;
+                            pop_symbol_table();
+                            $$ = $1;
+                          }// Double Optional
+                          | direct_abstract_declarator '(' ')' {
+                            $1.val.type = make_func_type(NULL, NULL, 0);
+                            $$ = $1;
+                          }
+                          |  '(' parameter_type_list ')'{
+                             fprintf(stderr, "UNIMPLEMNTED");
+                             exit(1);
+                          }
+                          | '(' ')' {
+                             fprintf(stderr, "UNIMPLEMNTED");
+                             exit(1);
+                          }
                           ;
 
 // 6.7.8
