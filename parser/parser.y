@@ -438,6 +438,9 @@ declaration_specifiers: storage_class_specifier declaration_specifiers {
                       ;
 
 init_declarator_list: init_declarator {
+                    if (symbol_table->st_type == PROTOTYPE) {
+                        shallow_pop_table();
+                    }
                     struct Type *t = add_to_end_and_reverse($1.val.type, $<current_symbol>0.val.type);
                         struct SymbolTableNode n = make_st_node($1.name, $1.namespc, $1.type, $<current_symbol>0.val.sc, t,$1.val.initalizer);
                         /* // TODO fill in IDENT TYPE */
@@ -737,7 +740,7 @@ direct_declarator: IDENT {
                         t = $1.val.type;
                     }
                     $1.val.type = t;
-                    pop_symbol_table();
+                    /* pop_symbol_table(); */
                     $$ = $1;
                  }
                  | direct_declarator '(' identifier_list ')' {
@@ -916,7 +919,7 @@ direct_abstract_declarator: '(' abstract_declarator ')' {$$ = $2;}
                                 t = $1.val.type;
                             }
                             $1.val.type = t;
-                            pop_symbol_table();
+                            shallow_pop_table();
                             $$ = $1;
                           }// Double Optional
                           | direct_abstract_declarator '(' ')' {
@@ -978,7 +981,25 @@ labeled_statment: IDENT ':' statment
                 ;
 
 // 6.8.2
-compound_statment: '{' {create_scope(FUNC);} block_item_list '}' { // Optional
+compound_statment: '{' {
+                           if (symbol_table->st_type == PROTOTYPE) {
+                               if (symbol_table->len == 1 && symbol_table->nodearr[0].val.type->type == T_VOID) {
+                                   symbol_table->st_type = FUNC;
+                               } else {
+                                   size_t i;
+                                   for(i = 0; i<symbol_table->len; ++i) {
+                                      if(symbol_table->nodearr[i].name == NULL) {
+                                        yyerror("Abstract Declarator not valid for function Definiton");
+                                        exit(2);
+                                      }
+
+                                   }
+                                   symbol_table->st_type = FUNC;
+                               }
+                           }
+                           else
+                               create_scope(BLOCK);
+                       } block_item_list '}' { // Optional
                     $$ = $3;
                     shallow_pop_table();
                  }

@@ -58,6 +58,8 @@ int find_in_table(char *name, enum Namespace namespc, struct SymbolTable *ct,
     }
     size_t i;
     for (i = 0; i < ct->len; ++i) {
+        if (ct->nodearr[i].name == NULL)
+            continue;
         if (strcmp(name, ct->nodearr[i].name) == 0 &&
             ct->nodearr[i].namespc == namespc) {
             if (output != NULL)

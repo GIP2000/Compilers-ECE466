@@ -2,7 +2,7 @@
 #include <stdlib.h>
 enum IdentType { VARIABLE, FUNCTION, TYPEDEFNAME, TAG, LABELNAME, MEMBER };
 
-enum SymbolTableType { GLOBAL = 0, FUNC, PROTOTYPE, STRUCT_OR_UNION };
+enum SymbolTableType { GLOBAL = 0, FUNC, PROTOTYPE, STRUCT_OR_UNION, BLOCK };
 
 enum StorageClass {
     S_AUTO,
