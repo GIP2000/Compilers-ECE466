@@ -758,7 +758,7 @@ direct_declarator: IDENT {
                     exit(2);
                  } // Optional
                  | direct_declarator '(' {create_scope(PROTOTYPE);} ')' {
-                    shallow_pop_table();
+                    $1.st = shallow_pop_table();
                     $1.node.val.type = make_func_type(NULL, NULL, 0);
                     $$ = $1;
                  }
