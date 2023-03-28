@@ -16,24 +16,6 @@ extern FileInfo file_info;
 FILE *yyin;
 struct SymbolTable *symbol_table;
 
-void print_output() {
-    size_t i;
-    for (i = 0; i < symbol_table->len; ++i) {
-        if (symbol_table->nodearr[i].type != 0)
-            continue;
-        printf("name: %s, storage_class: %d, type ",
-               symbol_table->nodearr[i].name, symbol_table->nodearr[i].val.sc);
-        print_type(symbol_table->nodearr[i].val.type);
-        if (symbol_table->nodearr[i].val.type->type == T_FUNC) {
-            printf("{\n");
-            print_AstNode(
-                symbol_table->nodearr[i].val.type->extentions.func.statment, 0);
-            printf("}");
-        }
-        printf("\n");
-    }
-}
-
 int main(int argc, char **argv) {
     // #ifdef YYDEBUG
     //     yydebug = 1;
@@ -49,7 +31,7 @@ int main(int argc, char **argv) {
         if (result != 0) {
             return result;
         }
-        print_output();
+        print_st(symbol_table);
         return 0;
     }
     int i;
@@ -71,7 +53,7 @@ int main(int argc, char **argv) {
         if (ret != 0) {
             return ret;
         }
-        print_output();
+        print_st(symbol_table);
         // pop_global_table();
         symbol_table = initalize_table(10);
     }
