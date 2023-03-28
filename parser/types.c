@@ -375,12 +375,12 @@ void print_type_i(struct Type *type, int prev_pointer) {
     }
 
     if (type->type == T_FUNC) {
-        printf(" ret: ");
+        printf(" ret: ( ");
         if (type->extentions.func.ret == NULL)
             printf("Unkown");
         else
             print_type_i(type->extentions.func.ret, 0);
-        printf(" args: (");
+        printf(") args: (");
         size_t i;
         for (i = 0; i < type->extentions.func.arg_count; ++i) {
             print_type_i(&type->extentions.func.args[i], 0);

@@ -1,4 +1,5 @@
 #include "./symbol_table.h"
+#include "./ast.h"
 #include "./types.h"
 #include <stdio.h>
 #include <stdlib.h>
@@ -15,6 +16,29 @@ struct SymbolTable *initalize_table(size_t capacity) {
         sizeof(struct SymbolTableNode) * capacity);
 
     return symbol_table;
+}
+
+void print_st(struct SymbolTable *st) {
+    if (st == NULL) {
+        printf("symbol table is null\n");
+        return;
+    } else {
+        printf("st: \n");
+    }
+    size_t i;
+    for (i = 0; i < st->len; ++i) {
+        if (st->nodearr[i].type != 0)
+            continue;
+        printf("name: %s, storage_class: %d, type ", st->nodearr[i].name,
+               st->nodearr[i].val.sc);
+        print_type(st->nodearr[i].val.type);
+        if (st->nodearr[i].val.type->type == T_FUNC) {
+            printf("{\n");
+            print_AstNode(st->nodearr[i].val.type->extentions.func.statment, 0);
+            printf("}");
+        }
+        printf("\n");
+    }
 }
 
 struct SymbolTable *shallow_pop_table() {
@@ -122,6 +146,20 @@ enum StorageClass get_default_sc() {
         return S_STATIC;
     }
     return S_AUTO;
+}
+
+struct StNodeTablePair make_st_node_pair_from(struct SymbolTable *st,
+                                              struct SymbolTableNode node) {
+    struct StNodeTablePair r;
+    r.st = st;
+    r.node = node;
+    return r;
+}
+struct StNodeTablePair make_st_node_pair(struct SymbolTableNode node) {
+    struct StNodeTablePair r;
+    r.st = symbol_table;
+    r.node = node;
+    return r;
 }
 
 struct SymbolTableNode make_st_node(char *name, enum Namespace namespc,

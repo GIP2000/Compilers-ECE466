@@ -1,4 +1,5 @@
 #pragma once
+#include "ast.h"
 #include <stdlib.h>
 enum IdentType { VARIABLE, FUNCTION, TYPEDEFNAME, TAG, LABELNAME, MEMBER };
 
@@ -36,11 +37,19 @@ struct SymbolTableNode {
         struct AstNode *initalizer;
     } val;
 };
+struct StNodeTablePair {
+    struct SymbolTable *st;
+    struct SymbolTableNode node;
+};
 
+struct StNodeTablePair make_st_node_pair(struct SymbolTableNode node);
+struct StNodeTablePair make_st_node_pair_from(struct SymbolTable *st,
+                                              struct SymbolTableNode node);
 struct SymbolTableNode make_st_node(char *name, enum Namespace namespc,
                                     enum IdentType ident_type,
                                     enum StorageClass sc, struct Type *type,
                                     struct AstNode *initalizer);
+void print_st(struct SymbolTable *st);
 
 enum StorageClass get_default_sc();
 

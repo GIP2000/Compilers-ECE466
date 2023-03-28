@@ -21,6 +21,7 @@
     enum TypeQualifier type_qualifier;
     enum FunctionSpecifier function_specifier;
     int flag;
+    struct StNodeTablePair st_node_pair;
 }
 
 %token IDENT
@@ -101,7 +102,8 @@
 
 %type <arg_expression_list> argument_expression_list
 %type <storage_class> storage_class_specifier
-%type <current_symbol> declaration_specifiers direct_abstract_declarator direct_declarator abstract_declarator declarator init_declarator parameter_declaration struct_declarator struct_declarator_list
+%type <current_symbol> declaration_specifiers init_declarator struct_declarator_list
+%type <st_node_pair> direct_abstract_declarator direct_declarator abstract_declarator declarator parameter_declaration struct_declarator
 %type <type> type_specifier pointer struct_or_union_specifier specifier_qualifer_list
 %type <type_qualifier> type_qualifier type_qualifier_list
 %type <function_specifier> function_specifier
@@ -438,9 +440,10 @@ declaration_specifiers: storage_class_specifier declaration_specifiers {
                       ;
 
 init_declarator_list: init_declarator {
-                    if (symbol_table->st_type == PROTOTYPE) {
-                        shallow_pop_table();
-                    }
+                    /* fprintf(stderr, "I got here\n"); */
+                    /* if (symbol_table->st_type == PROTOTYPE) { */
+                    /*     shallow_pop_table(); */
+                    /* } */
                     struct Type *t = add_to_end_and_reverse($1.val.type, $<current_symbol>0.val.type);
                         struct SymbolTableNode n = make_st_node($1.name, $1.namespc, $1.type, $<current_symbol>0.val.sc, t,$1.val.initalizer);
                         /* // TODO fill in IDENT TYPE */
@@ -453,6 +456,10 @@ init_declarator_list: init_declarator {
                         $$ = make_StatementList(decl);
                     }
                     | init_declarator_list ',' init_declarator {
+                        /* fprintf(stderr, "I got here 2 wd\n"); */
+                        /* if (symbol_table->st_type == PROTOTYPE) { */
+                        /*     shallow_pop_table(); */
+                        /* } */
                         struct SymbolTableNode *n = $1->statments.head->node->declaration.symbol;
                         struct Type * t = add_to_end_and_reverse($3.val.type, n->val.type);
                         struct SymbolTableNode node = make_st_node($3.name, $3.namespc, $3.type, n->val.sc, t,$3.val.initalizer);
@@ -467,10 +474,10 @@ init_declarator_list: init_declarator {
                     }
                     ;
 
-init_declarator: declarator {$$ = $1;}
+init_declarator: declarator {$$ = $1.node;}
                | declarator '=' initalizer {
-                    $1.val.initalizer = $3;
-                    $$ = $1;
+                    $1.node.val.initalizer = $3;
+                    $$ = $1.node;
                }
                ;
 // 6.7.1
@@ -585,20 +592,20 @@ specifier_qualifer_list: type_specifier specifier_qualifer_list {
                        ;
 
 struct_declarator_list: struct_declarator {
-                            struct Type * t = add_to_end_and_reverse($1.val.type, $<type>0);
-                            $1.val.type = t;
-                          enter_in_namespace($1, MEMS);
-                          $$ = $1;
+                          struct Type * t = add_to_end_and_reverse($1.node.val.type, $<type>0);
+                          $1.node.val.type = t;
+                          enter_in_namespace($1.node, MEMS);
+                          $$ = $1.node;
                       }
                       | struct_declarator_list ',' struct_declarator {
-                          struct Type * t = add_to_end_and_reverse($3.val.type, $1.val.type);
-                          $3.val.type = t;
-                          enter_in_namespace($3, MEMS);
-                          $$ = $3;
+                          struct Type * t = add_to_end_and_reverse($3.node.val.type, $1.val.type);
+                          $3.node.val.type = t;
+                          enter_in_namespace($3.node, MEMS);
+                          $$ = $3.node;
                       }
                       ;
 
-struct_declarator: declarator {if($1.val.type != NULL && $1.val.type->type == T_FUNC) {fprintf(stderr, "No Function members\n"); exit(2);} $$ = $1;}
+struct_declarator: declarator {if($1.node.val.type != NULL && $1.node.val.type->type == T_FUNC) {fprintf(stderr, "No Function members\n"); exit(2);} $$ = $1;}
                  | declarator ':' constant_expression {fprintf(stderr, "UNIMPLEMNTED"); exit(1);}// Optional
                  | ':' constant_expression {fprintf(stderr, "UNIMPLEMNTED"); exit(1);}// Optional
                  ;
@@ -648,19 +655,19 @@ alignment_specifier: _ALIGNAS '(' type_name ')' {
 
 // 6.7.6
 declarator: pointer direct_declarator {
-          if($2.val.type != NULL) {
-            struct Type * t = $2.val.type->type == T_FUNC ? $2.val.type : get_last_from_next($2.val.type);
+          if($2.node.val.type != NULL) {
+            struct Type * t = $2.node.val.type->type == T_FUNC ? $2.node.val.type : get_last_from_next($2.node.val.type);
             if (t->type == T_FUNC) {
                 t->extentions.func.ret = $1;
                 $$ = $2;
             } else {
-             get_last_from_next($1)->extentions.next_type.next = $2.val.type;
-             $2.val.type = $1;
+             get_last_from_next($1)->extentions.next_type.next = $2.node.val.type;
+             $2.node.val.type = $1;
              $$ = $2;
             }
           } else {
-             get_last_from_next($1)->extentions.next_type.next = $2.val.type;
-             $2.val.type = $1;
+             get_last_from_next($1)->extentions.next_type.next = $2.node.val.type;
+             $2.node.val.type = $1;
              $$ = $2;
           }
           }
@@ -670,30 +677,30 @@ declarator: pointer direct_declarator {
           ;
 
 direct_declarator: IDENT {
-                    $$ = make_st_node($1.str, ORD, 0, get_default_sc(), NULL, NULL);
+                    $$ = make_st_node_pair(make_st_node($1.str, ORD, 0, get_default_sc(), NULL, NULL));
                  }
                  | '(' declarator ')' {
                     $$ = $2; // Double check I interpreted this correctly
                  }
                  | direct_declarator '[' type_qualifier_list assignment_expression ']' {
-                    $1.val.type = make_next_type(T_ARR, $1.val.type);
-                    $1.val.type->qualifier_bit_mask = $3;
+                    $1.node.val.type = make_next_type(T_ARR, $1.node.val.type);
+                    $1.node.val.type->qualifier_bit_mask = $3;
                     /* $1.val.type = merge_if_next($1.val.type, make_next_type(T_ARR, NULL)); */
-                    $1.val.type->extentions.next_type.arr_size_expression = $4;
+                    $1.node.val.type->extentions.next_type.arr_size_expression = $4;
                     $$ = $1;
                  }// Double Optional
                  | direct_declarator '['type_qualifier_list ']' {
-                    $1.val.type = make_next_type(T_ARR, $1.val.type);
-                    $1.val.type->qualifier_bit_mask = $3;
+                    $1.node.val.type = make_next_type(T_ARR, $1.node.val.type);
+                    $1.node.val.type->qualifier_bit_mask = $3;
                     $$ = $1;
                  }
                  | direct_declarator '[' assignment_expression ']' {
                     /* $1.val.type = merge_if_next($1.val.type, make_next_type(T_ARR, NULL)); */
-                    $1.val.type = make_next_type(T_ARR, $1.val.type);
+                    $1.node.val.type = make_next_type(T_ARR, $1.node.val.type);
                     $$ = $1;
                  }
                  | direct_declarator '[' ']' {
-                    $1.val.type = make_next_type(T_ARR, $1.val.type);
+                    $1.node.val.type = make_next_type(T_ARR, $1.node.val.type);
                     $$ = $1;
                  }
                  | direct_declarator '[' STATIC type_qualifier_list assignment_expression']' {
@@ -724,31 +731,35 @@ direct_declarator: IDENT {
                     /* $$ = $1; */
                  }
                  | direct_declarator '[' type_qualifier_list '*' ']'  {
-                    $1.val.type = make_next_type(T_ARR, $1.val.type);
-                    $1.val.type->qualifier_bit_mask = $3;
+                    $1.node.val.type = make_next_type(T_ARR, $1.node.val.type);
+                    $1.node.val.type->qualifier_bit_mask = $3;
                     $$ = $1;
                  }// Optional
                  | direct_declarator '[' '*' ']' {
+                    $1.node.val.type = make_next_type(T_ARR, $1.node.val.type);
                     $$ = $1;
-                    $1.val.type = make_next_type(T_ARR, $1.val.type);
                  }
                  | direct_declarator '(' {create_scope(PROTOTYPE);} parameter_type_list ')'{
                     struct Type * t = make_func_type(NULL, symbol_table, $4);
-                    if ($1.val.type != NULL) {
-                        struct Type * last = get_last_from_next($1.val.type);
+                    if ($1.node.val.type != NULL) {
+                        struct Type * last = get_last_from_next($1.node.val.type);
                         last->extentions.next_type.next = t;
-                        t = $1.val.type;
+                        t = $1.node.val.type;
+                    } else {
+                        $1.st = symbol_table;
                     }
-                    $1.val.type = t;
-                    /* pop_symbol_table(); */
+                    $1.node.val.type = t;
+                    shallow_pop_table();
+
                     $$ = $1;
                  }
                  | direct_declarator '(' identifier_list ')' {
                     yyerror("K&R Not Supported");
                     exit(2);
                  } // Optional
-                 | direct_declarator '(' ')' {
-                    $1.val.type = make_func_type(NULL, NULL, 0);
+                 | direct_declarator '(' {create_scope(PROTOTYPE);} ')' {
+                    shallow_pop_table();
+                    $1.node.val.type = make_func_type(NULL, NULL, 0);
                     $$ = $1;
                  }
                  ;
@@ -778,14 +789,14 @@ parameter_type_list: parameter_list {$$ = 0;}
                    ;
 
 parameter_list: parameter_declaration {
-                if(!enter_in_namespace($1, ORD)) {
+                if(!enter_in_namespace($1.node, ORD)) {
                     yyerror("Redefinition of Identifier");
                 };
                 $$ = NULL;
 
               }
               | parameter_list ',' parameter_declaration {
-                if(!enter_in_namespace($3, ORD)) {
+                if(!enter_in_namespace($3.node, ORD)) {
                     yyerror("Redefinition of Identifier");
                 };
                 $$ = NULL;
@@ -793,12 +804,12 @@ parameter_list: parameter_declaration {
               ;
 
 parameter_declaration: declaration_specifiers declarator {
-                       struct Type * t = add_to_end_and_reverse($2.val.type, $1.val.type);
-                       $$ = make_st_node($2.name, ORD, VARIABLE, $1.val.sc, t, NULL);
+                       struct Type * t = add_to_end_and_reverse($2.node.val.type, $1.val.type);
+                       $$ = make_st_node_pair(make_st_node($2.node.name, ORD, VARIABLE, $1.val.sc, t, NULL));
                      }
                      | declaration_specifiers abstract_declarator {
-                       struct Type * t = add_to_end_and_reverse($2.val.type, $1.val.type);
-                       $$ = make_st_node(NULL, ORD, VARIABLE, $1.val.sc, t, NULL);
+                       struct Type * t = add_to_end_and_reverse($2.node.val.type, $1.val.type);
+                       $$ = make_st_node_pair(make_st_node(NULL, ORD, VARIABLE, $1.val.sc, t, NULL));
                      }// Optional
                      | declaration_specifiers
                      ;
@@ -818,19 +829,19 @@ abstract_declarator: pointer {
                    }
                    | pointer direct_abstract_declarator {
 
-                      if($2.val.type != NULL) {
-                        struct Type * t = $2.val.type->type == T_FUNC ? $2.val.type : get_last_from_next($2.val.type);
+                      if($2.node.val.type != NULL) {
+                        struct Type * t = $2.node.val.type->type == T_FUNC ? $2.node.val.type : get_last_from_next($2.node.val.type);
                         if (t->type == T_FUNC) {
                             t->extentions.func.ret = $1;
                             $$ = $2;
                         } else {
-                         get_last_from_next($1)->extentions.next_type.next = $2.val.type;
-                         $2.val.type = $1;
+                         get_last_from_next($1)->extentions.next_type.next = $2.node.val.type;
+                         $2.node.val.type = $1;
                          $$ = $2;
                         }
                       } else {
-                         get_last_from_next($1)->extentions.next_type.next = $2.val.type;
-                         $2.val.type = $1;
+                         get_last_from_next($1)->extentions.next_type.next = $2.node.val.type;
+                         $2.node.val.type = $1;
                          $$ = $2;
                       }
                    }// Optional
@@ -842,10 +853,10 @@ abstract_declarator: pointer {
 direct_abstract_declarator: '(' abstract_declarator ')' {$$ = $2;}
                           | direct_abstract_declarator '[' type_qualifier_list assignment_expression ']' {
 
-                            $1.val.type = make_next_type(T_ARR, $1.val.type);
-                            $1.val.type->qualifier_bit_mask = $3;
-                            /* $1.val.type = merge_if_next($1.val.type, make_next_type(T_ARR, NULL)); */
-                            $1.val.type->extentions.next_type.arr_size_expression = $4;
+                            $1.node.val.type = make_next_type(T_ARR, $1.node.val.type);
+                            $1.node.val.type->qualifier_bit_mask = $3;
+                            /* $1.node.val.type = merge_if_next($1.node.val.type, make_next_type(T_ARR, NULL)); */
+                            $1.node.val.type->extentions.next_type.arr_size_expression = $4;
                             $$ = $1;
                           }// Triple Optional
                           | '[' ']' {
@@ -861,17 +872,17 @@ direct_abstract_declarator: '(' abstract_declarator ')' {$$ = $2;}
                              exit(1);
                           }
                           | direct_abstract_declarator '[' ']' {
-                             $1.val.type = make_next_type(T_ARR, $1.val.type);
+                             $1.node.val.type = make_next_type(T_ARR, $1.node.val.type);
                              $$ = $1;
                           }
                           | direct_abstract_declarator '[' type_qualifier_list  ']' {
-                    $1.val.type = make_next_type(T_ARR, $1.val.type);
-                    $1.val.type->qualifier_bit_mask = $3;
+                    $1.node.val.type = make_next_type(T_ARR, $1.node.val.type);
+                    $1.node.val.type->qualifier_bit_mask = $3;
                     $$ = $1;
                  }
                           | direct_abstract_declarator '['  assignment_expression ']'{
-                    /* $1.val.type = merge_if_next($1.val.type, make_next_type(T_ARR, NULL)); */
-                    $1.val.type = make_next_type(T_ARR, $1.val.type);
+                    /* $1.node.val.type = merge_if_next($1.node.val.type, make_next_type(T_ARR, NULL)); */
+                    $1.node.val.type = make_next_type(T_ARR, $1.node.val.type);
                     $$ = $1;
                  }
                           |  '[' type_qualifier_list assignment_expression ']'{
@@ -904,7 +915,7 @@ direct_abstract_declarator: '(' abstract_declarator ')' {$$ = $2;}
                           }
                           | direct_abstract_declarator '[' '*' ']' {
 
-                            $1.val.type = make_next_type(T_ARR, $1.val.type);
+                            $1.node.val.type = make_next_type(T_ARR, $1.node.val.type);
                             $$ = $1;
                           }// Optional
                           |  '[' '*' ']' {
@@ -913,17 +924,18 @@ direct_abstract_declarator: '(' abstract_declarator ')' {$$ = $2;}
                           }
                           | direct_abstract_declarator '(' {create_scope(PROTOTYPE);}parameter_type_list ')'  {
                             struct Type * t = make_func_type(NULL, symbol_table, $4);
-                            if ($1.val.type != NULL) {
-                                struct Type * last = get_last_from_next($1.val.type);
+                            if ($1.node.val.type != NULL) {
+                                struct Type * last = get_last_from_next($1.node.val.type);
                                 last->extentions.next_type.next = t;
-                                t = $1.val.type;
+                                t = $1.node.val.type;
                             }
-                            $1.val.type = t;
+                            $1.node.val.type = t;
                             shallow_pop_table();
                             $$ = $1;
                           }// Double Optional
-                          | direct_abstract_declarator '(' ')' {
-                            $1.val.type = make_func_type(NULL, NULL, 0);
+                          | direct_abstract_declarator '(' {create_scope(PROTOTYPE);} ')' {
+                            shallow_pop_table();
+                            $1.node.val.type = make_func_type(NULL, NULL, 0);
                             $$ = $1;
                           }
                           |  '(' parameter_type_list ')'{
@@ -981,25 +993,7 @@ labeled_statment: IDENT ':' statment
                 ;
 
 // 6.8.2
-compound_statment: '{' {
-                           if (symbol_table->st_type == PROTOTYPE) {
-                               if (symbol_table->len == 1 && symbol_table->nodearr[0].val.type->type == T_VOID) {
-                                   symbol_table->st_type = FUNC;
-                               } else {
-                                   size_t i;
-                                   for(i = 0; i<symbol_table->len; ++i) {
-                                      if(symbol_table->nodearr[i].name == NULL) {
-                                        yyerror("Abstract Declarator not valid for function Definiton");
-                                        exit(2);
-                                      }
-
-                                   }
-                                   symbol_table->st_type = FUNC;
-                               }
-                           }
-                           else
-                               create_scope(BLOCK);
-                       } block_item_list '}' { // Optional
+compound_statment: '{' {create_scope(BLOCK);} block_item_list '}' { // Optional
                     $$ = $3;
                     shallow_pop_table();
                  }
@@ -1062,21 +1056,21 @@ function_definition: declaration_specifiers declarator declaration_list compound
                     yyerror("K&R Not Supported");
                     exit(2);
                  }// Optional
-                   | declaration_specifiers declarator compound_statment {
-                    struct Type *t = add_to_end_and_reverse($2.val.type, $1.val.type);
-                    if (t->type != T_FUNC || $2.namespc != ORD) {
+                   | declaration_specifiers declarator '{' {symbol_table = $2.st;} block_item_list '}'{
+                    struct Type *t = add_to_end_and_reverse($2.node.val.type, $1.val.type);
+                    if (t->type != T_FUNC || $2.node.namespc != ORD) {
                         yyerror("Invalid Funciton Definiton");
                         exit(2);
                     }
-                    struct SymbolTableNode current_node = make_st_node($2.name, $2.namespc, $2.type, $1.val.sc,t, NULL);
+                    struct SymbolTableNode current_node = make_st_node($2.node.name, $2.node.namespc, $2.node.type, $1.val.sc,t, NULL);
                     // find in symbol table and attach compound_statment
                     // or enter in namespace
                     struct SymbolTableNode old_node;
                     int found;
-                    if((found = find_in_namespace($2.name, ORD, &old_node)) && func_is_comp(old_node.val.type, current_node.val.type)) {
-                        old_node.val.type->extentions.func.statment = $3;
+                    if((found = find_in_namespace($2.node.name, ORD, &old_node)) && func_is_comp(old_node.val.type, current_node.val.type)) {
+                        old_node.val.type->extentions.func.statment = $5;
                     } else if (!found) {
-                        current_node.val.type->extentions.func.statment = $3;
+                        current_node.val.type->extentions.func.statment = $5;
                         enter_in_namespace(current_node, ORD);
                     } else {
                         yyerror("funciton signature is not compatible");
