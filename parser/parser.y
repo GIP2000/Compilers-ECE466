@@ -98,7 +98,7 @@
 %token LN
 
 // types
-%type <astnode> constant primary_expression expression postfix_expression unary_expression cast_expression multiplicative_expression additive_expression shift_expression relational_expression equality_expression and_expression exclusive_or_expression inclusive_or_expression logical_and_expression logical_or_expression conditional_expression assignment_expression init_declarator_list initalizer parameter_list declaration statment compound_statment block_item_list block_item struct_declaration_list struct_declaration
+%type <astnode> constant primary_expression expression postfix_expression unary_expression cast_expression multiplicative_expression additive_expression shift_expression relational_expression equality_expression and_expression exclusive_or_expression inclusive_or_expression logical_and_expression logical_or_expression conditional_expression assignment_expression init_declarator_list initalizer parameter_list declaration statment compound_statment block_item_list block_item struct_declaration_list struct_declaration function_compount_statment
 
 %type <arg_expression_list> argument_expression_list
 %type <storage_class> storage_class_specifier
@@ -1052,12 +1052,18 @@ external_declaration: function_definition
                     | declaration
                     ;
 // 6.9.1
+
+
+// I made this myself
+function_compount_statment: '{' {symbol_table = $<st_node_pair>0.st;} block_item_list '}' {shallow_pop_table(); $$ = $3;}
+                          | '{' '}' {$$ = NULL;}
+                          ;
+
 function_definition: declaration_specifiers declarator declaration_list compound_statment {
                     yyerror("K&R Not Supported");
                     exit(2);
                  }// Optional
-                   | declaration_specifiers declarator '{' {symbol_table = $2.st;} block_item_list '}'{
-                    shallow_pop_table();
+                   | declaration_specifiers declarator function_compount_statment{
                     struct Type *t = add_to_end_and_reverse($2.node.val.type, $1.val.type);
                     if (t->type != T_FUNC || $2.node.namespc != ORD) {
                         yyerror("Invalid Funciton Definiton");
@@ -1069,9 +1075,9 @@ function_definition: declaration_specifiers declarator declaration_list compound
                     struct SymbolTableNode old_node;
                     int found;
                     if((found = find_in_table($2.node.name, ORD,symbol_table, &old_node)) && func_is_comp(old_node.val.type, current_node.val.type)) {
-                        old_node.val.type->extentions.func.statment = $5;
+                        old_node.val.type->extentions.func.statment = $3;
                     } else if (!found) {
-                        current_node.val.type->extentions.func.statment = $5;
+                        current_node.val.type->extentions.func.statment = $3;
                         enter_in_namespace(current_node, ORD);
                     } else {
                         yyerror("funciton signature is not compatible");
