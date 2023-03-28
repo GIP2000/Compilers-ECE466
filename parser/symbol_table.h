@@ -65,4 +65,7 @@ int enter_in_namespace(struct SymbolTableNode node, enum Namespace namespc);
 void pop_global_table();
 
 void pop_symbol_table();
+
+int find_in_table(char *name, enum Namespace namespc, struct SymbolTable *ct,
+                  struct SymbolTableNode *output);
 struct SymbolTable *shallow_pop_table();

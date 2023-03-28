@@ -1057,6 +1057,7 @@ function_definition: declaration_specifiers declarator declaration_list compound
                     exit(2);
                  }// Optional
                    | declaration_specifiers declarator '{' {symbol_table = $2.st;} block_item_list '}'{
+                    shallow_pop_table();
                     struct Type *t = add_to_end_and_reverse($2.node.val.type, $1.val.type);
                     if (t->type != T_FUNC || $2.node.namespc != ORD) {
                         yyerror("Invalid Funciton Definiton");
@@ -1067,7 +1068,7 @@ function_definition: declaration_specifiers declarator declaration_list compound
                     // or enter in namespace
                     struct SymbolTableNode old_node;
                     int found;
-                    if((found = find_in_namespace($2.node.name, ORD, &old_node)) && func_is_comp(old_node.val.type, current_node.val.type)) {
+                    if((found = find_in_table($2.node.name, ORD,symbol_table, &old_node)) && func_is_comp(old_node.val.type, current_node.val.type)) {
                         old_node.val.type->extentions.func.statment = $5;
                     } else if (!found) {
                         current_node.val.type->extentions.func.statment = $5;
