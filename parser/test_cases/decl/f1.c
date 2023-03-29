@@ -1,9 +1,9 @@
 int f();
-int h(int a);
+int h(int);
 
 int f(double i) { int j; }
 
-void (*g(double d))(int a, char b) {
+void (*g(double d))(int, char) {
     int f();
     int g();
 }

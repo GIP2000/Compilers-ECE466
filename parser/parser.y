@@ -811,7 +811,7 @@ parameter_declaration: declaration_specifiers declarator {
                        struct Type * t = add_to_end_and_reverse($2.node.val.type, $1.val.type);
                        $$ = make_st_node_pair(make_st_node(NULL, ORD, VARIABLE, $1.val.sc, t, NULL));
                      }// Optional
-                     | declaration_specifiers
+                     | declaration_specifiers {$$ = make_st_node_pair($1);}
                      ;
 
 identifier_list: IDENT
@@ -824,11 +824,9 @@ type_name: specifier_qualifer_list abstract_declarator // Optional
          ;
 
 abstract_declarator: pointer {
-                             fprintf(stderr, "UNIMPLEMNTED");
-                             exit(1);
+                             $$ = make_st_node_pair(make_st_node(NULL, ORD, 0, get_default_sc(), $1, NULL));
                    }
                    | pointer direct_abstract_declarator {
-
                       if($2.node.val.type != NULL) {
                         struct Type * t = $2.node.val.type->type == T_FUNC ? $2.node.val.type : get_last_from_next($2.node.val.type);
                         if (t->type == T_FUNC) {
@@ -846,6 +844,7 @@ abstract_declarator: pointer {
                       }
                    }// Optional
                    | direct_abstract_declarator {
+                       fprintf(stderr, "No pointer\n");
                        $$ = $1;
                    }
                    ;
@@ -860,16 +859,15 @@ direct_abstract_declarator: '(' abstract_declarator ')' {$$ = $2;}
                             $$ = $1;
                           }// Triple Optional
                           | '[' ']' {
-                             fprintf(stderr, "UNIMPLEMNTED");
-                             exit(1);
+                             $$ = make_st_node_pair(make_st_node(NULL, ORD, 0, get_default_sc(), make_next_type(T_ARR, NULL), NULL));
                           }
                           | '[' type_qualifier_list  ']'{
-                             fprintf(stderr, "UNIMPLEMNTED");
-                             exit(1);
+                             $$ = make_st_node_pair(make_st_node(NULL, ORD, 0, get_default_sc(), make_next_type(T_ARR, NULL), NULL));
+                             $$.node.val.type->qualifier_bit_mask = $2;
                           }
                           | '[' assignment_expression ']'{
-                             fprintf(stderr, "UNIMPLEMNTED");
-                             exit(1);
+                             $$ = make_st_node_pair(make_st_node(NULL, ORD, 0, get_default_sc(), make_next_type(T_ARR, NULL), NULL));
+                             $$.node.val.type->extentions.next_type.arr_size_expression = $2;
                           }
                           | direct_abstract_declarator '[' ']' {
                              $1.node.val.type = make_next_type(T_ARR, $1.node.val.type);
@@ -886,8 +884,9 @@ direct_abstract_declarator: '(' abstract_declarator ')' {$$ = $2;}
                     $$ = $1;
                  }
                           |  '[' type_qualifier_list assignment_expression ']'{
-                             fprintf(stderr, "UNIMPLEMNTED");
-                             exit(1);
+                             $$ = make_st_node_pair(make_st_node(NULL, ORD, 0, get_default_sc(), make_next_type(T_ARR, NULL), NULL));
+                             $$.node.val.type->qualifier_bit_mask = $2;
+                             $$.node.val.type->extentions.next_type.arr_size_expression = $3;
                           }
                           | direct_abstract_declarator '[' STATIC type_qualifier_list assignment_expression ']' {
                              fprintf(stderr, "UNIMPLEMNTED");
@@ -928,23 +927,25 @@ direct_abstract_declarator: '(' abstract_declarator ')' {$$ = $2;}
                                 struct Type * last = get_last_from_next($1.node.val.type);
                                 last->extentions.next_type.next = t;
                                 t = $1.node.val.type;
+                            } else {
+                                $1.st = symbol_table;
                             }
                             $1.node.val.type = t;
                             shallow_pop_table();
                             $$ = $1;
                           }// Double Optional
                           | direct_abstract_declarator '(' {create_scope(PROTOTYPE);} ')' {
-                            shallow_pop_table();
+                            $1.st = shallow_pop_table();
                             $1.node.val.type = make_func_type(NULL, NULL, 0);
                             $$ = $1;
                           }
-                          |  '(' parameter_type_list ')'{
-                             fprintf(stderr, "UNIMPLEMNTED");
-                             exit(1);
+                          |  '(' {create_scope(PROTOTYPE);} parameter_type_list ')'{
+                              $$ = make_st_node_pair(make_st_node(NULL, ORD, 0, get_default_sc(), make_func_type(NULL, symbol_table, $3), NULL));
+                              $$.st = shallow_pop_table();
                           }
-                          | '(' ')' {
-                             fprintf(stderr, "UNIMPLEMNTED");
-                             exit(1);
+                          | '('{create_scope(PROTOTYPE);} ')' {
+                             $$ = make_st_node_pair(make_st_node(NULL, ORD, 0, get_default_sc(), make_func_type(NULL, NULL, 0), NULL));
+                             $$.st = shallow_pop_table();
                           }
                           ;
 
@@ -1004,8 +1005,7 @@ block_item_list: block_item {$$ = make_StatementList($1);}
                | block_item_list block_item {append_StatmentList(&$1->statments, $2); $$ = $1;}
                ;
 
-block_item: declaration
-          | statment
+block_item: statment
           ;
 
 // 6.8.3
