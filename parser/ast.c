@@ -103,6 +103,32 @@ AstNode *make_Declaration(struct SymbolTableNode *symbol) {
     return ast;
 }
 
+AstNode *make_IfStatment(AstNode *cond, AstNode *statment,
+                         AstNode *else_statment) {
+    AstNode *node = make_AstNode(ASTNODE_IF_STATMENT);
+    node->if_statment.cmp = cond;
+    node->if_statment.statment = statment;
+    node->if_statment.else_statment = else_statment;
+    return node;
+}
+
+AstNode *make_WhileStatment(AstNode *cond, AstNode *statment, int is_do) {
+    AstNode *node = make_AstNode(ASTNODE_WHILE_STATMENT);
+    node->while_statment.cmp = cond;
+    node->while_statment.statment = statment;
+    node->while_statment.is_do = is_do;
+    return node;
+}
+AstNode *make_ForStatment(AstNode *initalizer, AstNode *cond,
+                          AstNode *incrementer, AstNode *statment) {
+    AstNode *node = make_AstNode(ASTNODE_FOR_STATMENT);
+    node->for_statment.initalizer = initalizer;
+    node->for_statment.cmp = cond;
+    node->for_statment.incrementer = incrementer;
+    node->for_statment.statment = statment;
+    return node;
+}
+
 struct AstNodeListNode *append_AstNodeListNode(struct AstNodeListNode *node,
                                                AstNode *next) {
     struct AstNodeListNode *head = make_node_list_node(next);
@@ -306,6 +332,41 @@ void print_AstNode(AstNode *head, unsigned int tab_count) {
             head->declaration.symbol->type, head->declaration.symbol->val.sc);
         print_type(head->declaration.symbol->val.type);
         printf("\n");
+        return;
+    case ASTNODE_IF_STATMENT:
+        printf("IF Statment: Condition: \n");
+        print_AstNode(head->if_statment.cmp, tab_count + 1);
+        add_tab(tab_count);
+        printf("Then: \n");
+        print_AstNode(head->if_statment.statment, tab_count + 1);
+        add_tab(tab_count);
+        if (head->if_statment.else_statment != NULL) {
+            printf("Otherwise: \n");
+            print_AstNode(head->if_statment.else_statment, tab_count + 1);
+        }
+        return;
+    case ASTNODE_WHILE_STATMENT:
+        printf("%sWhile Statment: Comparison: ",
+               head->while_statment.is_do ? "DO " : "");
+
+        print_AstNode(head->while_statment.cmp, tab_count + 1);
+        add_tab(tab_count);
+        printf("Loop Statment: ");
+        print_AstNode(head->while_statment.statment, tab_count);
+        return;
+    case ASTNODE_FOR_STATMENT:
+        printf("For Loop Statment: Initalizer: ");
+
+        print_AstNode(head->for_statment.initalizer, tab_count + 1);
+        add_tab(tab_count);
+        printf("Comparison: ");
+        print_AstNode(head->for_statment.cmp, tab_count);
+        add_tab(tab_count);
+        printf("Incrementer: ");
+        print_AstNode(head->for_statment.incrementer, tab_count);
+        add_tab(tab_count);
+        printf("Statment: ");
+        print_AstNode(head->for_statment.statment, tab_count);
         return;
     default:
         fprintf(stderr, "Unsuportted Node type %d\n", head->type);

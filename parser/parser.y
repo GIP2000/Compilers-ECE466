@@ -98,7 +98,7 @@
 %token LN
 
 // types
-%type <astnode> constant primary_expression expression postfix_expression unary_expression cast_expression multiplicative_expression additive_expression shift_expression relational_expression equality_expression and_expression exclusive_or_expression inclusive_or_expression logical_and_expression logical_or_expression conditional_expression assignment_expression init_declarator_list initalizer parameter_list declaration statment compound_statment block_item_list block_item struct_declaration_list struct_declaration function_compount_statment
+%type <astnode> constant primary_expression expression postfix_expression unary_expression cast_expression multiplicative_expression additive_expression shift_expression relational_expression equality_expression and_expression exclusive_or_expression inclusive_or_expression logical_and_expression logical_or_expression conditional_expression assignment_expression init_declarator_list initalizer parameter_list declaration statment compound_statment block_item_list block_item struct_declaration_list struct_declaration function_compount_statment selection_statment iteration_statment
 
 %type <arg_expression_list> argument_expression_list
 %type <storage_class> storage_class_specifier
@@ -1014,25 +1014,25 @@ expression_statment: expression ';'
                    ;
 
 // 6.8.4
-selection_statment: IF '(' expression ')' statment
-                  | IF '(' expression ')' ELSE statment
-                  | SWITCH '(' expression ')' statment
+selection_statment: IF '(' expression ')' statment {$$ = make_IfStatment($3, $5, NULL);}
+                  | IF '(' expression ')' statment ELSE statment {$$ = make_IfStatment($3, $5, $7);}
+                  | SWITCH '(' expression ')' statment  {fprintf(stderr, "UNIMPLEMNTED\n"); exit(1);}
                   ;
 
-iteration_statment: WHILE '(' expression ')' statment
-                  | DO statment WHILE '(' expression ')' ';'
-                  | FOR '(' expression ';' expression ';' expression ')' statment // Triple Optional
-                  | FOR '(' ';' ';' ')' statment
-                  | FOR '(' expression ';'  ';'  ')' statment
-                  | FOR '('  ';' expression ';'  ')' statment
-                  | FOR '('  ';'  ';' expression ')' statment
-                  | FOR '(' expression ';'  ';' expression ')' statment
-                  | FOR '(' expression ';' expression ';'  ')' statment
-                  | FOR '('  ';' expression ';' expression ')' statment
-                  | FOR '(' declaration expression ';' expression ')' statment // Double Optional
-                  | FOR '(' declaration  ';'  ')' statment
-                  | FOR '(' declaration expression ';'  ')' statment
-                  | FOR '(' declaration  ';' expression ')' statment
+iteration_statment: WHILE '(' expression ')' statment {$$ = make_WhileStatment($3, $5, 0);}
+                  | DO statment WHILE '(' expression ')' ';' {$$ = make_WhileStatment($5, $2, 1);}
+                  | FOR '(' expression ';' expression ';' expression ')' statment  {$$ = make_ForStatment($3, $5, $7, $9);}// Triple Optional
+                  | FOR '(' ';' ';' ')' statment {$$ = make_ForStatment(NULL, NULL, NULL, $6);}
+                  | FOR '(' expression ';'  ';'  ')' statment {$$ = make_ForStatment($3, NULL, NULL, $7);}
+                  | FOR '('  ';' expression ';'  ')' statment {$$ = make_ForStatment(NULL, $4, NULL, $7);}
+                  | FOR '('  ';'  ';' expression ')' statment {$$ = make_ForStatment(NULL, NULL, $5, $7);}
+                  | FOR '(' expression ';'  ';' expression ')' statment {$$ = make_ForStatment($3, NULL, $6, $8);}
+                  | FOR '(' expression ';' expression ';'  ')' statment {$$ = make_ForStatment($3, $5, NULL, $8);}
+                  | FOR '('  ';' expression ';' expression ')' statment {$$ = make_ForStatment(NULL, $4, $6, $8);}
+                  | FOR '(' {create_scope(BLOCK);} declaration expression ';' expression ')' statment {$$ = make_ForStatment($3, $4, $6, $8); shallow_pop_table();}// Double Optional
+                  | FOR '(' {create_scope(BLOCK);} declaration  ';'  ')' statment {$$ = make_ForStatment($3, NULL, NULL, $6); shallow_pop_table();}
+                  | FOR '(' {create_scope(BLOCK);} declaration expression ';'  ')' statment {$$ = make_ForStatment($3, $4, NULL, $7); shallow_pop_table();}
+                  | FOR '(' {create_scope(BLOCK);} declaration  ';' expression ')' statment {$$ = make_ForStatment($3, NULL, $5, $7); shallow_pop_table();}
                   ;
 
 // 6.8.6
