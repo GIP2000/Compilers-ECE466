@@ -75,12 +75,29 @@ struct WhileStatment {
     int is_do;
 };
 
+#define ASTNODE_GOTO_STATMENT 13
+#define ASTNODE_CONTINUE_STATMENT 14
+#define ASTNODE_BREAK_STATMENT 15
+#define ASTNODE_RETURN_STATMENT 16
+#define ASTNODE_LABEL_STATMENT 17
+#define ASTNODE_SWITCH_STATMENT 18
+struct SwitchStatment {
+    struct AstNode *cmp;
+    struct AstNode *statment;
+};
+#define ASTNODE_CASE_STATMENT 19
+struct CaseStatment {
+    struct AstNode *cmp;
+    struct AstNode *statment;
+};
+#define ASTNODE_DEFAULT_STATMENT 20
+
 struct AstNode {
     int type;
     union {
         YYlvalNumLit constant;
         YYlvalStrLit strlit;
-        char *ident;
+        struct SymbolTableNode *ident;
         struct UnaryOp unary_op;
         struct BinaryOp binary_op;
         struct TernayOp ternary_op;
@@ -90,6 +107,11 @@ struct AstNode {
         struct IfStatment if_statment;
         struct ForStatment for_statment;
         struct WhileStatment while_statment;
+        struct SymbolTableNode *goto_statment;
+        struct AstNode *return_statment;
+        struct SwitchStatment switch_statment;
+        struct CaseStatment case_statment;
+        struct AstNode *deafult_statment;
     };
 };
 
@@ -127,3 +149,10 @@ AstNode *make_IfStatment(AstNode *cond, AstNode *statment,
 AstNode *make_WhileStatment(AstNode *cond, AstNode *statment, int is_do);
 AstNode *make_ForStatment(AstNode *initalizer, AstNode *cond,
                           AstNode *incrementer, AstNode *statment);
+AstNode *make_GotoStatment(struct SymbolTableNode *node);
+AstNode *make_LabelStatment(struct SymbolTableNode *node);
+
+AstNode *make_ReturnStatment(AstNode *statment);
+AstNode *make_SwitchStatment(AstNode *cmp, AstNode *statment);
+AstNode *make_CaseStatment(AstNode *cmp, AstNode *statment);
+AstNode *make_DefaultStatment(AstNode *statment);

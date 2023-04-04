@@ -98,7 +98,7 @@
 %token LN
 
 // types
-%type <astnode> constant primary_expression expression postfix_expression unary_expression cast_expression multiplicative_expression additive_expression shift_expression relational_expression equality_expression and_expression exclusive_or_expression inclusive_or_expression logical_and_expression logical_or_expression conditional_expression assignment_expression init_declarator_list initalizer parameter_list declaration statment compound_statment block_item_list block_item struct_declaration_list struct_declaration function_compount_statment selection_statment iteration_statment
+%type <astnode> constant primary_expression expression postfix_expression unary_expression cast_expression multiplicative_expression additive_expression shift_expression relational_expression equality_expression and_expression exclusive_or_expression inclusive_or_expression logical_and_expression logical_or_expression conditional_expression assignment_expression init_declarator_list initalizer parameter_list declaration statment compound_statment block_item_list block_item struct_declaration_list struct_declaration function_compount_statment selection_statment iteration_statment labeled_statment jump_statment expression_statment constant_expression
 
 %type <arg_expression_list> argument_expression_list
 %type <storage_class> storage_class_specifier
@@ -452,7 +452,7 @@ init_declarator_list: init_declarator {
                            exit(2);
                         };
 
-                        AstNode * decl = make_Declaration(&symbol_table->nodearr[symbol_table->len - 1]);
+                        AstNode * decl = make_Declaration(symbol_table->nodearr[symbol_table->len - 1]);
                         $$ = make_StatementList(decl);
                     }
                     | init_declarator_list ',' init_declarator {
@@ -468,7 +468,7 @@ init_declarator_list: init_declarator {
                            exit(2);
                         };
 
-                        AstNode * decl = make_Declaration(&symbol_table->nodearr[symbol_table->len - 1]);
+                        AstNode * decl = make_Declaration(symbol_table->nodearr[symbol_table->len - 1]);
                         append_StatmentList(&$1->statments, decl);
                         $$ = $1;
                     }
@@ -552,12 +552,13 @@ struct_or_union_specifier: struct_or_union IDENT '{' {create_scope(STRUCT_OR_UNI
                             $$ = n.val.type;
                          }
                          | struct_or_union IDENT {
-                            struct SymbolTableNode n;
+                            struct SymbolTableNode *n;
                             if (!find_in_namespace($2.str, TAGS, &n)) {
-                                n = make_st_node($2.str, TAGS, TAG, 0, make_struct_or_union($1, NULL), NULL);
-                                enter_in_namespace(n, TAGS); // Should always pass since I checked before
+                                struct SymbolTableNode node = make_st_node($2.str, TAGS, TAG, 0, make_struct_or_union($1, NULL), NULL);
+                                enter_in_namespace(node, TAGS); // Should always pass since I checked before
+                                find_in_namespace($2.str, TAGS, &n);
                             }
-                            $$ = n.val.type;
+                            $$ = n->val.type;
                         }
                         ;
 
@@ -988,9 +989,36 @@ statment: labeled_statment
         ;
 
 // 6.8.1
-labeled_statment: IDENT ':' statment
-                | CASE constant_expression ':' statment
-                | DEFAULT ':' statment
+labeled_statment: IDENT ':' statment {
+                    struct SymbolTableNode *n = NULL;
+                    if(!enter_in_namespace(make_st_node($1.str, LABEL,
+                                    LABELNAME,
+                                    0, make_label_type(1),
+                                    NULL), LABEL)) {
+                        find_in_namespace($1.str, LABEL, &n);
+                        if(n->val.type->extentions.label.initalized) {
+                            yyerror("Redefinition of Label");
+                            exit(2);
+                        } else {
+                            n->val.type->extentions.label.initalized = 1;
+                            AstNode * label_node = make_LabelStatment(n);
+                            AstNode * list = make_StatementList(label_node);
+                            append_StatmentList(&list->statments, $3);
+                            $$ = list;
+                        }
+                    } else {
+                        if(!find_in_namespace($1.str, LABEL, &n)) {
+                            fprintf(stderr, "This should never happend");
+                            exit(1);
+                        };
+                        AstNode * label_node = make_LabelStatment(n);
+                        AstNode * list = make_StatementList(label_node);
+                        append_StatmentList(&list->statments, $3);
+                        $$ = list;
+                    }
+                }
+                | CASE constant_expression ':' statment {fprintf(stderr, "debug\n");$$ = make_CaseStatment($2, $4);fprintf(stderr, "hi\n");}
+                | DEFAULT ':' statment {$$ = make_DefaultStatment($3);}
                 ;
 
 // 6.8.2
@@ -1010,14 +1038,16 @@ block_item: statment
 
 // 6.8.3
 expression_statment: expression ';'
-                   | ';'
+                   | ';' {$$ = NULL;}
                    ;
 
 // 6.8.4
 selection_statment: IF '(' expression ')' statment {$$ = make_IfStatment($3, $5, NULL);}
                   | IF '(' expression ')' statment ELSE statment {$$ = make_IfStatment($3, $5, $7);}
-                  | SWITCH '(' expression ')' statment  {fprintf(stderr, "UNIMPLEMNTED\n"); exit(1);}
+                  | SWITCH '(' expression ')' statment  {$$ = make_SwitchStatment($3, $5);}
                   ;
+
+make_block: {create_scope(BLOCK);};
 
 iteration_statment: WHILE '(' expression ')' statment {$$ = make_WhileStatment($3, $5, 0);}
                   | DO statment WHILE '(' expression ')' ';' {$$ = make_WhileStatment($5, $2, 1);}
@@ -1029,18 +1059,28 @@ iteration_statment: WHILE '(' expression ')' statment {$$ = make_WhileStatment($
                   | FOR '(' expression ';'  ';' expression ')' statment {$$ = make_ForStatment($3, NULL, $6, $8);}
                   | FOR '(' expression ';' expression ';'  ')' statment {$$ = make_ForStatment($3, $5, NULL, $8);}
                   | FOR '('  ';' expression ';' expression ')' statment {$$ = make_ForStatment(NULL, $4, $6, $8);}
-                  | FOR '(' {create_scope(BLOCK);} declaration expression ';' expression ')' statment {$$ = make_ForStatment($3, $4, $6, $8); shallow_pop_table();}// Double Optional
-                  | FOR '(' {create_scope(BLOCK);} declaration  ';'  ')' statment {$$ = make_ForStatment($3, NULL, NULL, $6); shallow_pop_table();}
-                  | FOR '(' {create_scope(BLOCK);} declaration expression ';'  ')' statment {$$ = make_ForStatment($3, $4, NULL, $7); shallow_pop_table();}
-                  | FOR '(' {create_scope(BLOCK);} declaration  ';' expression ')' statment {$$ = make_ForStatment($3, NULL, $5, $7); shallow_pop_table();}
+                  | FOR '(' make_block declaration expression ';' expression ')' statment {$$ = make_ForStatment($4, $5, $7, $9); shallow_pop_table();}// Double Optional
+                  | FOR '(' make_block declaration  ';'  ')' statment {$$ = make_ForStatment($4, NULL, NULL, $7); shallow_pop_table();}
+                  | FOR '(' make_block declaration expression ';'  ')' statment {$$ = make_ForStatment($4, $5, NULL, $8); shallow_pop_table();}
+                  | FOR '(' make_block declaration  ';' expression ')' statment {$$ = make_ForStatment($4, NULL, $6, $8); shallow_pop_table();}
                   ;
 
 // 6.8.6
-jump_statment: GOTO IDENT ';'
-             | CONTINUE ';'
-             | BREAK ';'
-             | RETURN expression ';' // Optional
-             | RETURN ';'
+jump_statment: GOTO IDENT ';' {
+                struct SymbolTableNode *n;
+                if(!find_in_namespace($2.str, LABEL,&n)) {
+                    enter_in_namespace(make_st_node($2.str, LABEL,
+                                    LABELNAME,
+                                    0, make_label_type(0),
+                                    NULL), LABEL);
+                    find_in_namespace($2.str, LABEL, &n);
+                };
+                $$ = make_GotoStatment(n);
+             }
+             | CONTINUE ';' {$$ = make_AstNode(ASTNODE_CONTINUE_STATMENT);}
+             | BREAK ';'{$$ = make_AstNode(ASTNODE_BREAK_STATMENT);}
+             | RETURN expression ';' {$$ = make_ReturnStatment($2);}// Optional
+             | RETURN ';' {$$ = make_ReturnStatment(NULL);}
              ;
 
 // 6.9
@@ -1055,7 +1095,7 @@ external_declaration: function_definition
 
 
 // I made this myself
-function_compount_statment: '{' {symbol_table = $<st_node_pair>0.st;} block_item_list '}' {shallow_pop_table(); $$ = $3;}
+function_compount_statment: '{' {symbol_table = $<st_node_pair>0.st; symbol_table->st_type = FUNC;} block_item_list '}' {shallow_pop_table(); $$ = $3;}
                           | '{' '}' {$$ = NULL;}
                           ;
 
@@ -1072,10 +1112,10 @@ function_definition: declaration_specifiers declarator declaration_list compound
                     struct SymbolTableNode current_node = make_st_node($2.node.name, $2.node.namespc, $2.node.type, $1.val.sc,t, NULL);
                     // find in symbol table and attach compound_statment
                     // or enter in namespace
-                    struct SymbolTableNode old_node;
+                    struct SymbolTableNode * old_node;
                     int found;
-                    if((found = find_in_table($2.node.name, ORD,symbol_table, &old_node)) && func_is_comp(old_node.val.type, current_node.val.type)) {
-                        old_node.val.type->extentions.func.statment = $3;
+                    if((found = find_in_table($2.node.name, ORD,symbol_table, &old_node)) && func_is_comp(old_node->val.type, current_node.val.type)) {
+                        old_node->val.type->extentions.func.statment = $3;
                     } else if (!found) {
                         current_node.val.type->extentions.func.statment = $3;
                         enter_in_namespace(current_node, ORD);

@@ -41,10 +41,10 @@ int types_eq(struct Type *t1, struct Type *t2) {
             return 0;
         size_t i;
         for (i = 0; i < t1->extentions.st_un.mem->len; ++i) {
-            if (t1->extentions.st_un.mem->nodearr[i].val.sc !=
-                    t2->extentions.st_un.mem->nodearr[i].val.sc ||
-                !types_eq(t1->extentions.st_un.mem->nodearr[i].val.type,
-                          t2->extentions.st_un.mem->nodearr[i].val.type))
+            if (t1->extentions.st_un.mem->nodearr[i]->val.sc !=
+                    t2->extentions.st_un.mem->nodearr[i]->val.sc ||
+                !types_eq(t1->extentions.st_un.mem->nodearr[i]->val.type,
+                          t2->extentions.st_un.mem->nodearr[i]->val.type))
                 return 0;
             ;
         }
@@ -129,8 +129,8 @@ struct Type *clone_type(struct Type *type) {
         memcpy(new_type->extentions.st_un.mem, type->extentions.st_un.mem,
                sizeof(struct SymbolTable));
         new_type->extentions.st_un.mem->nodearr =
-            (struct SymbolTableNode *)malloc(
-                sizeof(struct SymbolTableNode) *
+            (struct SymbolTableNode **)malloc(
+                sizeof(struct SymbolTableNode *) *
                 type->extentions.st_un.mem->capacity);
         memcpy(new_type->extentions.st_un.mem->nodearr,
                type->extentions.st_un.mem->nodearr,
@@ -138,8 +138,8 @@ struct Type *clone_type(struct Type *type) {
                    type->extentions.st_un.mem->capacity);
         size_t i;
         for (i = 0; i < new_type->extentions.st_un.mem->len; ++i) {
-            new_type->extentions.st_un.mem->nodearr[i].val.type =
-                clone_type(new_type->extentions.st_un.mem->nodearr[i].val.type);
+            new_type->extentions.st_un.mem->nodearr[i]->val.type = clone_type(
+                new_type->extentions.st_un.mem->nodearr[i]->val.type);
         }
     }
     return new_type;
@@ -158,7 +158,7 @@ void free_type(struct Type *type, int free_end) {
     } else if (type->type == T_STRUCT || type->type == T_UNION) {
         size_t i;
         for (i = 0; i < type->extentions.st_un.mem->len; ++i) {
-            free_type(type->extentions.st_un.mem->nodearr[i].val.type, 1);
+            free_type(type->extentions.st_un.mem->nodearr[i]->val.type, 1);
         }
         free(type->extentions.st_un.mem->nodearr);
     }
@@ -202,7 +202,7 @@ struct Type *make_func_type(struct Type *ret, struct SymbolTable *pt,
         (struct Type *)malloc(sizeof(struct Type) * pt->len);
     size_t i;
     for (i = 0; i < pt->len; ++i) {
-        struct Type *temp = clone_type(pt->nodearr[i].val.type);
+        struct Type *temp = clone_type(pt->nodearr[i]->val.type);
         type_obj->extentions.func.args[i] = *temp;
         free(temp);
     }
@@ -302,11 +302,18 @@ struct Type *make_struct_or_union(int is_struct, struct SymbolTable *mem) {
     t->extentions.st_un.mem = mem;
     return t;
 }
+struct Type *make_label_type(int initalized) {
+    struct Type *t = make_default_type(T_LABEL);
+    t->extentions.label.initalized = initalized;
+    return t;
+}
 
 void print_type_i(struct Type *type, int prev_pointer) {
 
     switch (type->type) {
-
+    case T_LABEL:
+        printf("LABEL");
+        break;
     case T_VOID:
         printf("VOID");
         break;
@@ -393,9 +400,9 @@ void print_type_i(struct Type *type, int prev_pointer) {
         printf(" members: (");
         size_t i;
         for (i = 0; i < type->extentions.st_un.mem->len; ++i) {
-            print_type_i(type->extentions.st_un.mem->nodearr[i].val.type, 0);
-            if (type->extentions.st_un.mem->nodearr[i].name != NULL) {
-                printf(" %s", type->extentions.st_un.mem->nodearr[i].name);
+            print_type_i(type->extentions.st_un.mem->nodearr[i]->val.type, 0);
+            if (type->extentions.st_un.mem->nodearr[i]->name != NULL) {
+                printf(" %s", type->extentions.st_un.mem->nodearr[i]->name);
             }
             printf(", ");
         }

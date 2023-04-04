@@ -6,14 +6,15 @@
 #include <string.h>
 
 extern struct SymbolTable *symbol_table;
+extern void yyerror(const char *s);
 
 struct SymbolTable *initalize_table(size_t capacity) {
     struct SymbolTable *symbol_table =
         (struct SymbolTable *)malloc(sizeof(struct SymbolTable));
     symbol_table->capacity = capacity;
     symbol_table->len = 0;
-    symbol_table->nodearr = (struct SymbolTableNode *)malloc(
-        sizeof(struct SymbolTableNode) * capacity);
+    symbol_table->nodearr = (struct SymbolTableNode **)malloc(
+        sizeof(struct SymbolTableNode *) * capacity);
 
     return symbol_table;
 }
@@ -23,18 +24,19 @@ void print_st(struct SymbolTable *st) {
         printf("symbol table is null\n");
         return;
     } else {
-        printf("st: \n");
+        printf("st (%d): \n", st->st_type);
     }
     size_t i;
     for (i = 0; i < st->len; ++i) {
-        if (st->nodearr[i].type != 0)
-            continue;
-        printf("name: %s, storage_class: %d, type ", st->nodearr[i].name,
-               st->nodearr[i].val.sc);
-        print_type(st->nodearr[i].val.type);
-        if (st->nodearr[i].val.type->type == T_FUNC) {
+        // if (st->nodearr[i]->type != ORD)
+        //     continue;
+        printf("name: %s, storage_class: %d, type ", st->nodearr[i]->name,
+               st->nodearr[i]->val.sc);
+        print_type(st->nodearr[i]->val.type);
+        if (st->nodearr[i]->val.type->type == T_FUNC) {
             printf("{\n");
-            print_AstNode(st->nodearr[i].val.type->extentions.func.statment, 0);
+            print_AstNode(st->nodearr[i]->val.type->extentions.func.statment,
+                          0);
             printf("}");
         }
         printf("\n");
@@ -49,8 +51,8 @@ struct SymbolTable *shallow_pop_table() {
 void pop_global_table() {
     size_t i;
     for (i = 0; i < symbol_table->len; ++i) {
-        free(symbol_table->nodearr[i].name);
-        free_type(symbol_table->nodearr[i].val.type, 1);
+        free(symbol_table->nodearr[i]->name);
+        free_type(symbol_table->nodearr[i]->val.type, 1);
     }
     free(symbol_table->nodearr);
 
@@ -76,16 +78,16 @@ void create_scope(enum SymbolTableType type) {
 }
 
 int find_in_table(char *name, enum Namespace namespc, struct SymbolTable *ct,
-                  struct SymbolTableNode *output) {
+                  struct SymbolTableNode **output) {
     if (name == NULL) {
         return 0;
     }
     size_t i;
     for (i = 0; i < ct->len; ++i) {
-        if (ct->nodearr[i].name == NULL)
+        if (ct->nodearr[i]->name == NULL)
             continue;
-        if (strcmp(name, ct->nodearr[i].name) == 0 &&
-            ct->nodearr[i].namespc == namespc) {
+        if (strcmp(name, ct->nodearr[i]->name) == 0 &&
+            (namespc == ANY || ct->nodearr[i]->namespc == namespc)) {
             if (output != NULL)
                 *output = ct->nodearr[i];
             return 1;
@@ -102,13 +104,23 @@ int enter_in_namespace(struct SymbolTableNode node, enum Namespace namespc) {
     while (st->st_type == STRUCT_OR_UNION && namespc != MEMS) {
         st = st->parent;
     }
+
+    while (namespc == LABEL && st->st_type != FUNC) {
+        st = st->parent;
+        if (st == NULL) {
+            yyerror("Invalid Label Location");
+            exit(2);
+        }
+    }
     struct SymbolTable *symbol_table = st;
 
-    struct SymbolTableNode n;
+    struct SymbolTableNode *n =
+        (struct SymbolTableNode *)malloc(sizeof(struct SymbolTableNode));
+
     if (find_in_table(node.name, namespc, symbol_table, &n)) {
         // handle case of completing an incomplete struct
-        if (namespc == TAGS && n.val.type->extentions.st_un.mem == NULL) {
-            n.val.type->extentions.st_un.mem =
+        if (namespc == TAGS && n->val.type->extentions.st_un.mem == NULL) {
+            n->val.type->extentions.st_un.mem =
                 node.val.type->extentions.st_un.mem;
             return 1;
         }
@@ -124,16 +136,18 @@ int enter_in_namespace(struct SymbolTableNode node, enum Namespace namespc) {
         symbol_table->capacity = symbol_table->len + 10;
     }
 
-    symbol_table->nodearr[symbol_table->len++] = node;
+    *n = node;
+    symbol_table->nodearr[symbol_table->len++] = n;
 
     return 1;
 }
 
 int find_in_namespace(char *name, enum Namespace namespc,
-                      struct SymbolTableNode *output) {
+                      struct SymbolTableNode **output) {
     struct SymbolTable *ct = symbol_table;
     while (ct != NULL) {
-        if (find_in_table(name, namespc, ct, output)) {
+        if ((namespc != LABEL || ct->st_type == FUNC) &&
+            find_in_table(name, namespc, ct, output)) {
             return 1;
         }
         ct = ct->parent;

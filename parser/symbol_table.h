@@ -17,10 +17,11 @@ enum Namespace {
     LABEL,
     MEMS,
     TAGS,
+    ANY, // Only used for searching should never be assigned
 };
 
 struct SymbolTable {
-    struct SymbolTableNode *nodearr;
+    struct SymbolTableNode **nodearr;
     size_t len;
     size_t capacity;
     struct SymbolTable *parent;
@@ -58,7 +59,7 @@ struct SymbolTable *initalize_table(size_t capacity);
 void create_scope(enum SymbolTableType type);
 
 int find_in_namespace(char *name, enum Namespace namespc,
-                      struct SymbolTableNode *output);
+                      struct SymbolTableNode **output);
 
 int enter_in_namespace(struct SymbolTableNode node, enum Namespace namespc);
 
@@ -67,5 +68,5 @@ void pop_global_table();
 void pop_symbol_table();
 
 int find_in_table(char *name, enum Namespace namespc, struct SymbolTable *ct,
-                  struct SymbolTableNode *output);
+                  struct SymbolTableNode **output);
 struct SymbolTable *shallow_pop_table();

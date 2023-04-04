@@ -17,6 +17,7 @@ enum FunctionSpecifier {
 
 enum Types {
     T_VOID,
+    T_LABEL,
     T_SHORT,
     T_INT,
     T_CHAR,
@@ -56,6 +57,10 @@ struct Type {
             struct SymbolTable *mem;
             int is_struct;
         } st_un;
+        struct {
+            int initalized;
+            // TODO add BB info
+        } label;
     } extentions;
 };
 
@@ -81,3 +86,4 @@ struct Type *make_func_type(struct Type *ret, struct SymbolTable *pt,
 struct Type *get_last_from_next(struct Type *t);
 
 struct Type *make_struct_or_union(int is_struct, struct SymbolTable *mem);
+struct Type *make_label_type(int initalized);

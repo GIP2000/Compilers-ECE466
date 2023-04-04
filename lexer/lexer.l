@@ -87,6 +87,6 @@ _Thread_local {return _THREAD_LOCAL;}
 &=  {return ANDEQ;}
 \|=  {return OREQ;}
 \^=  {return XOREQ;}
-[\n ] {}
+[\n \t] {}
 .                           {fprintf(stderr, "%s:%d: Error: Unkown Token (%s)\n", file_info.file_name,yylineno - file_info.real_line_start + file_info.file_line_start, yytext); }
 %%

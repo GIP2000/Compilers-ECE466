@@ -6,6 +6,8 @@
 #include <stdlib.h>
 #include <string.h>
 
+extern struct SymbolTable *symbol_table;
+
 AstNode *make_AstNode(int type) {
     AstNode *node = (AstNode *)malloc(sizeof(AstNode));
     node->type = type;
@@ -31,7 +33,11 @@ AstNode *make_unary_op(int op, AstNode *child) {
 
 AstNode *make_IdentNode(YYlvalStrLit val) {
     AstNode *ast = make_AstNode(ASTNODE_IDENT);
-    ast->ident = val.str;
+    if (!find_in_namespace(val.str, ANY, &ast->ident)) {
+        fprintf(stderr, "Ident: %s\n", val.str);
+        yyerror("Ident referenced before assignment");
+        exit(2);
+    };
     return ast;
 }
 
@@ -127,6 +133,40 @@ AstNode *make_ForStatment(AstNode *initalizer, AstNode *cond,
     node->for_statment.incrementer = incrementer;
     node->for_statment.statment = statment;
     return node;
+}
+AstNode *make_GotoStatment(struct SymbolTableNode *node) {
+    AstNode *ast = make_AstNode(ASTNODE_GOTO_STATMENT);
+    ast->goto_statment = node;
+    return ast;
+}
+
+AstNode *make_LabelStatment(struct SymbolTableNode *node) {
+
+    AstNode *ast = make_AstNode(ASTNODE_LABEL_STATMENT);
+    ast->goto_statment = node;
+    return ast;
+}
+AstNode *make_ReturnStatment(AstNode *statment) {
+    AstNode *ast = make_AstNode(ASTNODE_RETURN_STATMENT);
+    ast->return_statment = statment;
+    return ast;
+}
+AstNode *make_SwitchStatment(AstNode *cmp, AstNode *statment) {
+    AstNode *ast = make_AstNode(ASTNODE_SWITCH_STATMENT);
+    ast->switch_statment.cmp = cmp;
+    ast->switch_statment.statment = statment;
+    return ast;
+}
+AstNode *make_CaseStatment(AstNode *cmp, AstNode *statment) {
+    AstNode *ast = make_AstNode(ASTNODE_CASE_STATMENT);
+    ast->case_statment.cmp = cmp;
+    ast->case_statment.statment = statment;
+    return ast;
+}
+AstNode *make_DefaultStatment(AstNode *statment) {
+    AstNode *ast = make_AstNode(ASTNODE_DEFAULT_STATMENT);
+    ast->deafult_statment = statment;
+    return ast;
 }
 
 struct AstNodeListNode *append_AstNodeListNode(struct AstNodeListNode *node,
@@ -274,7 +314,10 @@ void print_AstNode(AstNode *head, unsigned int tab_count) {
         printf("String Literal %s\n", head->strlit.str);
         return;
     case ASTNODE_IDENT:
-        printf("IDENT %s\n", head->ident);
+        printf("IDENT %s with type: \n", head->ident->name);
+        add_tab(tab_count + 1);
+        print_type(head->ident->val.type);
+        printf("\n");
         return;
     case ASTNODE_UNARYOP: {
         char op[4] = {0, 0, 0, 0};
@@ -367,6 +410,40 @@ void print_AstNode(AstNode *head, unsigned int tab_count) {
         add_tab(tab_count);
         printf("Statment: ");
         print_AstNode(head->for_statment.statment, tab_count);
+        return;
+    case ASTNODE_GOTO_STATMENT:
+        printf("Goto %s\n", head->goto_statment->name);
+        return;
+    case ASTNODE_CONTINUE_STATMENT:
+        printf("Continue\n");
+        return;
+    case ASTNODE_BREAK_STATMENT:
+        printf("Break\n");
+        return;
+    case ASTNODE_RETURN_STATMENT:
+        printf("Return: \n");
+        print_AstNode(head->return_statment, tab_count + 1);
+        return;
+    case ASTNODE_LABEL_STATMENT:
+        printf("Label %s\n", head->goto_statment->name);
+        return;
+    case ASTNODE_SWITCH_STATMENT:
+        printf("Switch Conditon: \n");
+        print_AstNode(head->switch_statment.cmp, tab_count + 1);
+        add_tab(tab_count);
+        printf("Statment: \n");
+        print_AstNode(head->switch_statment.statment, tab_count);
+        return;
+    case ASTNODE_CASE_STATMENT:
+        printf("Case Statment Condition: \n");
+        print_AstNode(head->case_statment.cmp, tab_count + 1);
+        add_tab(tab_count);
+        printf("Statment: \n");
+        print_AstNode(head->case_statment.statment, tab_count + 1);
+        return;
+    case ASTNODE_DEFAULT_STATMENT:
+        printf("Deafult Statment :\n");
+        print_AstNode(head->deafult_statment, tab_count + 1);
         return;
     default:
         fprintf(stderr, "Unsuportted Node type %d\n", head->type);
