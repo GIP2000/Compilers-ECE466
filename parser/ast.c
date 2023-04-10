@@ -303,6 +303,7 @@ void print_AstNode(AstNode *head, unsigned int tab_count) {
     }
     // make the tabs
     add_tab(tab_count);
+    printf("%s:%d: ", head->fi.file_name, head->fi.ln);
     switch (head->type) {
     case ASTNODE_CONSTANT:
         printf("Constant ");

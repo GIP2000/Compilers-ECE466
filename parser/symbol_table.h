@@ -20,6 +20,11 @@ enum Namespace {
     ANY, // Only used for searching should never be assigned
 };
 
+struct DebugFileInfo {
+    char *name;
+    int ln;
+};
+
 struct SymbolTable {
     struct SymbolTableNode **nodearr;
     size_t len;
@@ -32,10 +37,7 @@ struct SymbolTableNode {
     char *name;
     enum Namespace namespc;
     enum IdentType type;
-    struct {
-        char *name;
-        int ln;
-    } fi;
+    struct DebugFileInfo fi;
     struct {
         enum StorageClass sc;
         struct Type *type;

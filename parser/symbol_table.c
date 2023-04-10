@@ -33,8 +33,9 @@ void print_st(struct SymbolTable *st) {
     for (i = 0; i < st->len; ++i) {
         // if (st->nodearr[i]->type != ORD)
         //     continue;
-        printf("name: %s, storage_class: %d, type ", st->nodearr[i]->name,
-               st->nodearr[i]->val.sc);
+        printf("%s: %d: name: %s, storage_class: %d, type ",
+               st->nodearr[i]->fi.name, st->nodearr[i]->fi.ln,
+               st->nodearr[i]->name, st->nodearr[i]->val.sc);
         print_type(st->nodearr[i]->val.type);
         if (st->nodearr[i]->val.type->type == T_FUNC) {
             printf("{\n");
