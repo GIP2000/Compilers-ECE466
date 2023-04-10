@@ -41,8 +41,10 @@ int types_eq(struct Type *t1, struct Type *t2) {
             return 0;
         size_t i;
         for (i = 0; i < t1->extentions.st_un.mem->len; ++i) {
-            if (t1->extentions.st_un.mem->nodearr[i]->val.sc !=
-                    t2->extentions.st_un.mem->nodearr[i]->val.sc ||
+            if ((t1->extentions.st_un.mem->nodearr[i]->val.sc.sd !=
+                     t2->extentions.st_un.mem->nodearr[i]->val.sc.sd &&
+                 t1->extentions.st_un.mem->nodearr[i]->val.sc.sl !=
+                     t2->extentions.st_un.mem->nodearr[i]->val.sc.sl) ||
                 !types_eq(t1->extentions.st_un.mem->nodearr[i]->val.type,
                           t2->extentions.st_un.mem->nodearr[i]->val.type))
                 return 0;

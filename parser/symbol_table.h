@@ -12,6 +12,23 @@ enum StorageClass {
     S_STATIC,
 };
 
+enum StorageDuration {
+    SD_STATIC,
+    SD_EXTERNAL,
+    SD_AUTO,
+};
+
+enum StorageLinkage {
+    SL_INTERNAL,
+    SL_EXTERNAL,
+    SL_NONE,
+};
+
+struct EffectiveStorageClass {
+    enum StorageDuration sd;
+    enum StorageLinkage sl;
+};
+
 enum Namespace {
     ORD = 0,
     LABEL,
@@ -39,7 +56,8 @@ struct SymbolTableNode {
     enum IdentType type;
     struct DebugFileInfo fi;
     struct {
-        enum StorageClass sc;
+        // enum StorageClass sc;
+        struct EffectiveStorageClass sc;
         struct Type *type;
         struct AstNode *initalizer;
     } val;
@@ -54,13 +72,16 @@ struct StNodeTablePair make_st_node_pair_from(struct SymbolTable *st,
                                               struct SymbolTableNode node);
 struct SymbolTableNode make_st_node(char *name, enum Namespace namespc,
                                     enum IdentType ident_type,
-                                    enum StorageClass sc, struct Type *type,
+                                    struct EffectiveStorageClass sc,
+                                    struct Type *type,
                                     struct AstNode *initalizer);
 void print_st(struct SymbolTable *st);
 
-enum StorageClass get_default_sc();
+struct EffectiveStorageClass get_default_sc();
 
 struct SymbolTable *initalize_table(size_t capacity);
+
+struct EffectiveStorageClass make_eff_storage_class(enum StorageClass);
 
 void create_scope(enum SymbolTableType type);
 

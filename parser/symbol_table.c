@@ -33,9 +33,11 @@ void print_st(struct SymbolTable *st) {
     for (i = 0; i < st->len; ++i) {
         // if (st->nodearr[i]->type != ORD)
         //     continue;
-        printf("%s: %d: name: %s, storage_class: %d, type ",
-               st->nodearr[i]->fi.name, st->nodearr[i]->fi.ln,
-               st->nodearr[i]->name, st->nodearr[i]->val.sc);
+        printf(
+            "%s: %d: name: %s, stroge duration: %d, storage linkage: %d: type ",
+            st->nodearr[i]->fi.name, st->nodearr[i]->fi.ln,
+            st->nodearr[i]->name, st->nodearr[i]->val.sc.sd,
+            st->nodearr[i]->val.sc.sl);
         print_type(st->nodearr[i]->val.type);
         if (st->nodearr[i]->val.type->type == T_FUNC) {
             printf("{\n");
@@ -159,11 +161,8 @@ int find_in_namespace(char *name, enum Namespace namespc,
     return 0;
 }
 
-enum StorageClass get_default_sc() {
-    if (symbol_table->st_type == GLOBAL) {
-        return S_STATIC;
-    }
-    return S_AUTO;
+struct EffectiveStorageClass get_default_sc() {
+    return make_eff_storage_class(S_AUTO);
 }
 
 struct StNodeTablePair make_st_node_pair_from(struct SymbolTable *st,
@@ -179,18 +178,49 @@ struct StNodeTablePair make_st_node_pair(struct SymbolTableNode node) {
     r.node = node;
     return r;
 }
+struct EffectiveStorageClass make_eff_storage_class(enum StorageClass sc) {
+    struct EffectiveStorageClass n;
+    switch (sc) {
+    case S_EXTERN:
+        n.sd = SD_EXTERNAL;
+        n.sl = SL_EXTERNAL;
+        break;
+    case S_STATIC:
+        n.sd = SD_STATIC;
+        n.sl = SL_INTERNAL;
+        break;
+    case S_REG:
+        fprintf(stderr, "UNIMPLEMNTED");
+        exit(2);
+        break;
+    case S_AUTO:
+        if (symbol_table->st_type == GLOBAL) {
+            n.sd = SD_STATIC;
+            n.sl = SL_EXTERNAL;
+        } else {
+            n.sd = SD_AUTO;
+            n.sl = SL_NONE;
+        }
+        break;
+    default:
+        fprintf(stderr, "UNRECHABLE Storage Class");
+        exit(1);
+    }
+    return n;
+}
 
 struct SymbolTableNode make_st_node(char *name, enum Namespace namespc,
                                     enum IdentType ident_type,
-                                    enum StorageClass sc, struct Type *type,
+                                    struct EffectiveStorageClass sc,
+                                    struct Type *type,
                                     struct AstNode *initalizer) {
     struct SymbolTableNode n;
     n.name = name;
     n.namespc = namespc;
     n.type = ident_type;
-    n.val.sc = sc;
     n.val.initalizer = initalizer;
     n.val.type = type;
+    n.val.sc = sc;
     n.fi.name = file_info.file_name;
     n.fi.ln = yylineno - file_info.real_line_start + file_info.file_line_start;
     return n;

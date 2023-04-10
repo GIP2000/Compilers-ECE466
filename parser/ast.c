@@ -378,9 +378,11 @@ void print_AstNode(AstNode *head, unsigned int tab_count) {
     }
     case ASTNODE_DECLARATION:
         printf(
-            "Decleration: %s namespace (%d) ident_type (%d) sc (%d) type: ",
+            "Decleration: %s namespace (%d) ident_type (%d) sc (%d) sl(%d) "
+            "type: ",
             head->declaration.symbol->name, head->declaration.symbol->namespc,
-            head->declaration.symbol->type, head->declaration.symbol->val.sc);
+            head->declaration.symbol->type, head->declaration.symbol->val.sc.sd,
+            head->declaration.symbol->val.sc.sl);
         print_type(head->declaration.symbol->val.type);
         printf("\n");
         return;

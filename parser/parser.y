@@ -15,7 +15,7 @@
     int op;
     struct AstNodeListNode* arg_expression_list;
     AstNode * astnode;
-    enum StorageClass storage_class;
+    struct EffectiveStorageClass storage_class;
     struct SymbolTableNode current_symbol;
     struct Type * type;
     enum TypeQualifier type_qualifier;
@@ -485,14 +485,20 @@ storage_class_specifier: TYPEDEF {
                         yyerror("UNIMPLEMNTED");
                         exit(1);
                        }
-                       | EXTERN {$$ = S_EXTERN;}
-                       | STATIC {$$ = S_STATIC;}
+                       | EXTERN {$$ = make_eff_storage_class(S_EXTERN);}
+                       | STATIC {$$ = make_eff_storage_class(S_STATIC);}
                        | _THREAD_LOCAL {
                             yyerror("UNIMPLEMNTED");
                             exit(1);
                        }
-                       | AUTO {$$ = S_AUTO;}
-                       | REGISTER {$$ = S_REG;}
+                       | AUTO {
+                           if (symbol_table->st_type == GLOBAL) {
+                               yyerror("keyword auto not allowed in Global Scope");
+                               exit(2);
+                           }
+                           $$ = make_eff_storage_class(S_AUTO);
+                       }
+                       | REGISTER {$$ = make_eff_storage_class(S_REG);}
                        ;
 
 // 6.7.2
@@ -533,7 +539,7 @@ type_specifier: VOID {$$ = make_default_type(T_VOID);}
 // 6.7.2.1
 struct_or_union_specifier: struct_or_union IDENT '{' {create_scope(STRUCT_OR_UNION);} struct_declaration_list '}' {
                             struct SymbolTable * members = shallow_pop_table();
-                            struct SymbolTableNode n = make_st_node($2.str, TAGS, TAG, 0, make_struct_or_union($1, members), NULL);
+                            struct SymbolTableNode n = make_st_node($2.str, TAGS, TAG, get_default_sc(), make_struct_or_union($1, members), NULL);
                             if(n.name != NULL && !enter_in_namespace(n, TAGS)) {
                                 yyerror("Struct Or Union Tag Redefinition");
                                 fprintf(stderr, "name = %s\n", n.name);
@@ -543,7 +549,7 @@ struct_or_union_specifier: struct_or_union IDENT '{' {create_scope(STRUCT_OR_UNI
                          }// Optional
                          | struct_or_union {create_scope(STRUCT_OR_UNION);}'{' struct_declaration_list '}' {
                             struct SymbolTable * members = shallow_pop_table();
-                            struct SymbolTableNode n = make_st_node(NULL, TAGS, TAG, 0, make_struct_or_union($1, members), NULL);
+                            struct SymbolTableNode n = make_st_node(NULL, TAGS, TAG, get_default_sc(), make_struct_or_union($1, members), NULL);
                             if(n.name != NULL && !enter_in_namespace(n, TAGS)) {
                                 yyerror("Struct Or Union Tag Redefinition");
                                 fprintf(stderr, "name = %s\n", n.name);
@@ -554,7 +560,7 @@ struct_or_union_specifier: struct_or_union IDENT '{' {create_scope(STRUCT_OR_UNI
                          | struct_or_union IDENT {
                             struct SymbolTableNode *n;
                             if (!find_in_namespace($2.str, TAGS, &n)) {
-                                struct SymbolTableNode node = make_st_node($2.str, TAGS, TAG, 0, make_struct_or_union($1, NULL), NULL);
+                                struct SymbolTableNode node = make_st_node($2.str, TAGS, TAG, get_default_sc(), make_struct_or_union($1, NULL), NULL);
                                 enter_in_namespace(node, TAGS); // Should always pass since I checked before
                                 find_in_namespace($2.str, TAGS, &n);
                             }
@@ -993,7 +999,7 @@ labeled_statment: IDENT ':' statment {
                     struct SymbolTableNode *n = NULL;
                     if(!enter_in_namespace(make_st_node($1.str, LABEL,
                                     LABELNAME,
-                                    0, make_label_type(1),
+                                    get_default_sc(), make_label_type(1),
                                     NULL), LABEL)) {
                         find_in_namespace($1.str, LABEL, &n);
                         if(n->val.type->extentions.label.initalized) {
@@ -1071,7 +1077,7 @@ jump_statment: GOTO IDENT ';' {
                 if(!find_in_namespace($2.str, LABEL,&n)) {
                     enter_in_namespace(make_st_node($2.str, LABEL,
                                     LABELNAME,
-                                    0, make_label_type(0),
+                                    get_default_sc(), make_label_type(0),
                                     NULL), LABEL);
                     find_in_namespace($2.str, LABEL, &n);
                 };
