@@ -2,6 +2,7 @@
 %option yylineno
 %{
 #include "./lexer/lexer_util.h"
+#include "./lexer/file_info.h"
 #include "./parser.tab.h"
 FileInfo file_info;
 void yyerror(char const *s) {

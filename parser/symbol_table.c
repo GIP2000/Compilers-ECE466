@@ -1,4 +1,5 @@
 #include "./symbol_table.h"
+#include "../lexer/file_info.h"
 #include "./ast.h"
 #include "./types.h"
 #include <stdio.h>
@@ -7,6 +8,8 @@
 
 extern struct SymbolTable *symbol_table;
 extern void yyerror(const char *s);
+extern FileInfo file_info;
+extern int yylineno;
 
 struct SymbolTable *initalize_table(size_t capacity) {
     struct SymbolTable *symbol_table =
@@ -187,5 +190,7 @@ struct SymbolTableNode make_st_node(char *name, enum Namespace namespc,
     n.val.sc = sc;
     n.val.initalizer = initalizer;
     n.val.type = type;
+    n.fi.name = file_info.file_name;
+    n.fi.ln = yylineno - file_info.real_line_start + file_info.file_line_start;
     return n;
 }

@@ -1,4 +1,5 @@
 #pragma once
+#include "../lexer/file_info.h"
 #include "./yylval_types.h"
 #include "symbol_table.h"
 
@@ -94,6 +95,10 @@ struct CaseStatment {
 
 struct AstNode {
     int type;
+    struct {
+        char *file_name;
+        int ln;
+    } fi;
     union {
         YYlvalNumLit constant;
         YYlvalStrLit strlit;

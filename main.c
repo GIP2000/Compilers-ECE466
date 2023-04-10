@@ -1,3 +1,4 @@
+#include "./lexer/file_info.h"
 #include "./parser.tab.h"
 #include "lexer/lexer_util.h"
 #include "parser.tab.h"

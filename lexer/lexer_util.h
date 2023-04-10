@@ -1,12 +1,6 @@
 #pragma once
 #include "../parser.tab.h"
 
-typedef struct {
-    char *file_name;
-    int file_line_start;
-    int real_line_start;
-} FileInfo;
-
 YYSTYPE convert_to_str(char *character, int len);
 YYSTYPE convert_to_char(char *character);
 YYSTYPE convert_to_float(char *number, int len, int base);

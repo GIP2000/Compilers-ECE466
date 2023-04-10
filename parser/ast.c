@@ -1,4 +1,5 @@
 #include "./ast.h"
+#include "../lexer/file_info.h"
 #include "../parser.tab.h"
 #include "symbol_table.h"
 #include <ctype.h>
@@ -6,11 +7,17 @@
 #include <stdlib.h>
 #include <string.h>
 
+extern FileInfo file_info;
+extern int yylineno;
+
 extern struct SymbolTable *symbol_table;
 
 AstNode *make_AstNode(int type) {
     AstNode *node = (AstNode *)malloc(sizeof(AstNode));
     node->type = type;
+    node->fi.file_name = file_info.file_name;
+    node->fi.ln =
+        yylineno - file_info.real_line_start + file_info.file_line_start;
     return node;
 }
 

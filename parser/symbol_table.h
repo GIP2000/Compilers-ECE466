@@ -33,6 +33,10 @@ struct SymbolTableNode {
     enum Namespace namespc;
     enum IdentType type;
     struct {
+        char *name;
+        int ln;
+    } fi;
+    struct {
         enum StorageClass sc;
         struct Type *type;
         struct AstNode *initalizer;
