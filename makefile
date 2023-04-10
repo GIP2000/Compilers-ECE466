@@ -26,14 +26,21 @@ ast.o: parser/ast.c parser/ast.h
 
 lex.o: lex.yy.c
 	gcc $(FLAGS) lex.yy.c -c -o lex.o
+
 lex_test.o: lexer/lexer_test.c
 	gcc $(FLAGS) -c lexer/lexer_test.c -o lex_test.o
+
+quad.o: quads/quad.c quads/quad.h
+	gcc $(FLAGS) -c quads/quad.c -o quad.o
+
+ast_parser.o: quads/ast_parser.h quads/ast_parser.c
+	gcc $(FLAGS) -c quads/ast_parser.c -o ast_parser.o
 
 main.o: main.c
 	gcc $(FLAGS) -c main.c -o main.o
 
-gip: lex.o ast.o lexer_util.o parser.tab.o main.o symbol_table.o types.o
-	gcc $(FLAGS) main.o lex.o lexer_util.o parser.tab.o ast.o symbol_table.o types.o -o gip
+gip: lex.o ast.o lexer_util.o parser.tab.o main.o symbol_table.o types.o quad.o ast_parser.o
+	gcc $(FLAGS) main.o lex.o lexer_util.o parser.tab.o ast.o symbol_table.o types.o quad.o ast_parser.o -o gip
 
 lex_test.out: lex.o lexer_util.o lex_test.o
 	gcc $(FLAGS) lex.o lexer_util.o lex_test.o -o lex_test.out

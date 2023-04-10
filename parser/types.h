@@ -33,8 +33,9 @@ enum Types {
     T_STRUCT,
     T_UNION,
     T_ENUM
-
 };
+const int TYPE_SIZE_TABLE[T_ENUM + 1] = {0, 0, 2, 4, 1, 4,  8,  4, 0,
+                                         0, 8, 4, 0, 0, -1, -1, 4};
 
 struct Type {
     enum Types type;

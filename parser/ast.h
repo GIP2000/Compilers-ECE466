@@ -5,7 +5,7 @@
 
 #define ASTNODE_CONSTANT 1
 #define ASTNODE_STRLIT 2
-#define ASTNODE_IDENT 3 // TODO make this with scopes and stuff
+#define ASTNODE_IDENT 3
 
 #define ASTNODE_UNARYOP 4
 struct UnaryOp {
