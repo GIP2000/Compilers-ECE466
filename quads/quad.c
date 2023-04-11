@@ -10,6 +10,7 @@ struct BasicBlockArr initalize_BasicBlockArr(size_t inital_cap) {
     if (inital_cap == 0)
         bba.cap = inital_cap;
 
+    bba.len = 0;
     bba.arr = (struct BasicBlock *)malloc(sizeof(struct BasicBlock) * bba.cap);
     return bba;
 }
@@ -19,7 +20,7 @@ void realloc_BBA(struct BasicBlockArr *bba) {
     bba->arr = realloc(bba->arr, sizeof(struct BasicBlock) * bba->cap);
 }
 void append_basic_block(struct BasicBlockArr *bba, struct BasicBlock bb) {
-    if (bba->len > bba->cap) {
+    if (bba->len >= bba->cap) {
         realloc_BBA(bba);
     }
     bba->arr[bba->len++] = bb;
@@ -84,6 +85,7 @@ void print_bb(struct BasicBlock *bb, int add_tab) {
 }
 void print_bba(struct BasicBlockArr *bba) {
     size_t i;
+
     for (i = 0; i < bba->len; ++i) {
         printf("BasicBlock #%zu\n", i);
         print_bb(&bba->arr[i], 1);

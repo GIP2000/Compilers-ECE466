@@ -23,6 +23,7 @@ struct Location {
 enum Operation {
     LOAD,
     STORE,
+    LEA,
 };
 
 struct Quad {

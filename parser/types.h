@@ -16,7 +16,7 @@ enum FunctionSpecifier {
 };
 
 enum Types {
-    T_VOID,
+    T_VOID = 0,
     T_LABEL,
     T_SHORT,
     T_INT,
@@ -34,8 +34,8 @@ enum Types {
     T_UNION,
     T_ENUM
 };
-const int TYPE_SIZE_TABLE[T_ENUM + 1] = {0, 0, 2, 4, 1, 4,  8,  4, 0,
-                                         0, 8, 4, 0, 0, -1, -1, 4};
+
+typedef int SIZEOF_TABLE[T_ENUM + 1];
 
 struct Type {
     enum Types type;
@@ -57,6 +57,8 @@ struct Type {
         struct {
             struct SymbolTable *mem;
             int is_struct;
+            int is_cached;
+            unsigned long long cached_size;
         } st_un;
         struct {
             int initalized;

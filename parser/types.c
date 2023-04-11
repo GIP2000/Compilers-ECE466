@@ -5,6 +5,9 @@
 
 extern void yyerror(char *);
 
+const SIZEOF_TABLE TYPE_SIZE_TABLE = {0, 0, 2,  4, 1, 4,  8,  8, 0,
+                                      0, 8, -1, 0, 0, -1, -1, 4};
+
 int types_eq(struct Type *t1, struct Type *t2) {
     if (t1->type != t2->type) {
         return 0;
@@ -302,6 +305,8 @@ struct Type *make_struct_or_union(int is_struct, struct SymbolTable *mem) {
     struct Type *t = make_default_type(T_STRUCT);
     t->extentions.st_un.is_struct = is_struct;
     t->extentions.st_un.mem = mem;
+    t->extentions.st_un.is_cached = 0;
+    t->extentions.st_un.cached_size = 0;
     return t;
 }
 struct Type *make_label_type(int initalized) {

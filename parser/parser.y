@@ -756,6 +756,7 @@ direct_declarator: IDENT {
                         $1.st = symbol_table;
                     }
                     $1.node.val.type = t;
+                    $1.node.type = FUNCTION;
                     shallow_pop_table();
 
                     $$ = $1;
@@ -767,6 +768,7 @@ direct_declarator: IDENT {
                  | direct_declarator '(' {create_scope(PROTOTYPE);} ')' {
                     $1.st = shallow_pop_table();
                     $1.node.val.type = make_func_type(NULL, NULL, 0);
+                    $1.node.type = FUNCTION;
                     $$ = $1;
                  }
                  ;
@@ -938,20 +940,22 @@ direct_abstract_declarator: '(' abstract_declarator ')' {$$ = $2;}
                                 $1.st = symbol_table;
                             }
                             $1.node.val.type = t;
+                            $1.node.type = FUNCTION;
                             shallow_pop_table();
                             $$ = $1;
                           }// Double Optional
                           | direct_abstract_declarator '(' {create_scope(PROTOTYPE);} ')' {
                             $1.st = shallow_pop_table();
                             $1.node.val.type = make_func_type(NULL, NULL, 0);
+                            $1.node.type = FUNCTION;
                             $$ = $1;
                           }
                           |  '(' {create_scope(PROTOTYPE);} parameter_type_list ')'{
-                              $$ = make_st_node_pair(make_st_node(NULL, ORD, 0, get_default_sc(), make_func_type(NULL, symbol_table, $3), NULL));
+                              $$ = make_st_node_pair(make_st_node(NULL, ORD, FUNCTION, get_default_sc(), make_func_type(NULL, symbol_table, $3), NULL));
                               $$.st = shallow_pop_table();
                           }
                           | '('{create_scope(PROTOTYPE);} ')' {
-                             $$ = make_st_node_pair(make_st_node(NULL, ORD, 0, get_default_sc(), make_func_type(NULL, NULL, 0), NULL));
+                             $$ = make_st_node_pair(make_st_node(NULL, ORD, FUNCTION, get_default_sc(), make_func_type(NULL, NULL, 0), NULL));
                              $$.st = shallow_pop_table();
                           }
                           ;
