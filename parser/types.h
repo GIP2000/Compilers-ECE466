@@ -18,9 +18,9 @@ enum FunctionSpecifier {
 enum Types {
     T_VOID = 0,
     T_LABEL,
+    T_CHAR,
     T_SHORT,
     T_INT,
-    T_CHAR,
     T_FLOAT,
     T_DOUBLE,
     T_POINTER, // next range

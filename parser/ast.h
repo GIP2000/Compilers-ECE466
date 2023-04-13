@@ -92,9 +92,16 @@ struct CaseStatment {
     struct AstNode *statment;
 };
 #define ASTNODE_DEFAULT_STATMENT 20
+#define ASTNODE_CAST 21
+struct CastStatment {
+    struct AstNode *val;
+    struct AstNode *type_name;
+};
+#define ASTNODE_TYPENAME 22
 
 struct AstNode {
     int type;
+    struct Type *value_type;
     struct {
         char *file_name;
         int ln;
@@ -117,6 +124,7 @@ struct AstNode {
         struct SwitchStatment switch_statment;
         struct CaseStatment case_statment;
         struct AstNode *deafult_statment;
+        struct CastStatment cast_statment;
     };
 };
 
@@ -161,3 +169,9 @@ AstNode *make_ReturnStatment(AstNode *statment);
 AstNode *make_SwitchStatment(AstNode *cmp, AstNode *statment);
 AstNode *make_CaseStatment(AstNode *cmp, AstNode *statment);
 AstNode *make_DefaultStatment(AstNode *statment);
+
+AstNode *make_CastStatment(AstNode *val, AstNode *type_name);
+AstNode *make_Typename(struct Type *type_name);
+
+AstNode *make_ConstantType(YYlvalNumLit constant);
+AstNode *make_StringType(YYlvalStrLit constant);

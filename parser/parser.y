@@ -129,8 +129,8 @@
 // Also Idents right now are very ugly but I don't want to fix them until I have to implement them fully
 
 // 6.4.4
-constant: NUMBER {$$ = make_AstNode(ASTNODE_CONSTANT); AstNode * n = $$; n->constant = $1;}
-        | CHARLIT {$$ = make_AstNode(ASTNODE_CONSTANT); AstNode * n = $$; n->constant = $1;}
+constant: NUMBER {$$ = make_ConstantType($1);}
+        | CHARLIT {$$ = make_ConstantType($1);}
         ;
 
 // 6.5.1
@@ -140,9 +140,10 @@ primary_expression: IDENT {
                   }// More work needed to figure out what its value is (if its an enum ... ) scoping and all that jazz
                   | constant
                   | STRING {
-                    $$ = make_AstNode(ASTNODE_STRLIT);
-                    AstNode * n = $$;
-                    n->strlit = $1;
+                    $$ = make_StringType($1);
+                    /* $$ = make_AstNode(ASTNODE_STRLIT); */
+                    /* AstNode * n = $$; */
+                    /* n->strlit = $1; */
                   }
                   | '(' expression ')' {$$ = $2;}
                   | generic_selection {yyerror("Not Implemented"); exit(1);}
