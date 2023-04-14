@@ -5,6 +5,42 @@
 VReg next_vreg = VREG_START;
 const size_t inital_cap = 100;
 
+struct Location make_Location_int(long long v) {
+    struct Location l;
+    l.loc_type = CONSTINT;
+    l.deref = 0;
+    l.const_int = v;
+    return l;
+}
+struct Location make_Location_float(double v) {
+    struct Location l;
+    l.loc_type = CONSTFLOAT;
+    l.deref = 0;
+    l.const_int = v;
+    return l;
+}
+struct Location make_Location_reg() {
+    struct Location l;
+    l.loc_type = REG;
+    l.deref = 0;
+    l.reg = next_vreg++;
+    return l;
+}
+struct Location make_Location_empty_reg() {
+    struct Location l;
+    l.loc_type = REG;
+    l.deref = 0;
+    l.reg = EMPTY_VREG;
+    return l;
+}
+struct Location make_Location_var(struct SymbolTableNode *v) {
+    struct Location l;
+    l.loc_type = VAR;
+    l.var = v;
+    l.deref = 0;
+    return l;
+}
+
 struct BasicBlockArr initalize_BasicBlockArr(size_t inital_cap) {
     struct BasicBlockArr bba;
     if (inital_cap == 0)
@@ -29,6 +65,8 @@ void append_basic_block(struct BasicBlockArr *bba, struct BasicBlock bb) {
 struct BasicBlock make_bb(struct SymbolTableNode *ref) {
     struct BasicBlock bb;
     bb.ref = ref;
+    bb.head = NULL;
+    bb.tail = NULL;
     return bb;
 }
 
@@ -58,18 +96,76 @@ void append_quad(struct BasicBlock *bb, struct Quad quad) {
 void print_location(struct Location *loc) {
     if (loc->deref)
         printf("[");
-    if (loc->is_var) {
+    if (loc->loc_type == VAR)
         printf("%s", loc->var->name);
-        return;
-    }
-    printf("%%T%04d", loc->reg);
+    else if (loc->loc_type == CONSTINT)
+        printf("%lld", loc->const_int);
+    else if (loc->loc_type == CONSTFLOAT)
+        printf("%f", loc->const_float);
+    else if (loc->reg != EMPTY_VREG)
+        printf("%%T%04d", loc->reg);
     if (loc->deref)
         printf("]");
 }
+
+void print_op(enum Operation op) {
+    switch (op) {
+    case LOAD:
+        printf("LOAD");
+        break;
+    case STORE:
+        printf("STORE");
+        break;
+    case LEA:
+        printf("LEA");
+        break;
+    case MOV:
+        printf("MOV");
+        break;
+    // Math Ops
+    case ADD:
+        printf("ADD");
+        break;
+    case SUB:
+        printf("SUB");
+        break;
+    case MUL:
+        printf("MUL");
+        break;
+    case DIV:
+        printf("DIV");
+        break;
+    case FADD:
+        printf("FADD");
+        break;
+    case FSUB:
+        printf("FSUB");
+        break;
+    case FMUL:
+        printf("FMUL");
+        break;
+    case FDIV:
+        printf("FDIV");
+        break;
+
+    // BITWISE
+    case BINOT:
+        printf("BINOT");
+        break;
+
+    // LOGICAL
+    case LOGNOT:
+        printf("LOGNOT");
+        break;
+    }
+}
+
 void print_quad(struct Quad *q) {
     printf("Quad: ");
     print_location(&q->eq);
-    printf(" = %d ", q->op);
+    printf(" = ");
+    print_op(q->op);
+    printf(" ");
     print_location(&q->arg1);
     printf(" ");
     print_location(&q->arg2);
@@ -81,6 +177,7 @@ void print_bb(struct BasicBlock *bb, int add_tab) {
         if (add_tab)
             printf("  ");
         print_quad(&n->quad);
+        printf("\n");
     }
 }
 void print_bba(struct BasicBlockArr *bba) {

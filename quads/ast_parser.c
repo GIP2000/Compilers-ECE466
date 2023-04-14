@@ -1,4 +1,5 @@
 #include "./ast_parser.h"
+#include "../macro_util.h"
 #include "../parser.tab.h"
 #include "./quad.h"
 #include <stdio.h>
@@ -6,7 +7,7 @@
 extern SIZEOF_TABLE TYPE_SIZE_TABLE;
 extern VReg next_vreg;
 typedef unsigned long long u64;
-void parse_ast(struct BasicBlockArr *bba, AstNode *ast, struct Location *pass);
+int parse_ast(struct BasicBlockArr *bba, AstNode *ast, struct Location *pass);
 u64 size_of_abstract(struct Type *t);
 u64 get_struct_size(struct Type *t);
 u64 get_union_size(struct Type *t);
@@ -102,6 +103,7 @@ struct BasicBlockArr build_bba_from_st(struct SymbolTable *st) {
             continue;
         }
         append_basic_block(&bba, make_bb(st->nodearr[i]));
+        // TODO parse for all declarators
         parse_ast(&bba, st->nodearr[i]->val.type->extentions.func.statment,
                   NULL);
     }
@@ -116,74 +118,262 @@ int is_lvalue(AstNode *node) {
     return 0;
 }
 
+struct Location get_loc_from_parse_ast(int is_val, AstNode *node,
+                                       struct BasicBlockArr *bba,
+                                       struct Quad *out_quad) {
+    struct Location result;
+    if (is_val) {
+        if (node->type == ASTNODE_CONSTANT) {
+            if (node->constant.type >= TDOUBLE &&
+                node->constant.type <= TLONGDOUBLE)
+                result = make_Location_float(node->constant.val.flt);
+            else
+                result = make_Location_int(node->constant.val.u_int);
+
+        } else
+            result = make_Location_var(node->ident);
+    } else
+        result = bba->arr[bba->len - 1].tail->quad.eq;
+
+    if (out_quad != NULL && bba->arr[bba->len - 1].tail != NULL) {
+        *out_quad = bba->arr[bba->len - 1].tail->quad;
+    }
+
+    return result;
+}
+
 void parse_unary_op(struct BasicBlockArr *bba, struct UnaryOp *uop,
                     struct Location *eq) {
 
     struct Location eq_r;
     if (eq == NULL) {
-        eq_r.reg = next_vreg++;
+        eq_r = make_Location_reg();
     } else {
         eq_r = *eq;
     }
+    struct Location arg2 = make_Location_empty_reg();
 
     switch (uop->op) {
-    case '&':
+    case '&': {
         if (!is_lvalue(uop->child)) {
             fprintf(stderr, "Can't take the address of an rvalue\n");
             exit(3);
         }
-        parse_ast(bba, uop->child, NULL);
-        struct Location arg1 = bba->arr[bba->len - 1].tail->quad.eq;
-        struct Location arg2;
+        int is_val = parse_ast(bba, uop->child, NULL);
+        struct Location arg1 =
+            get_loc_from_parse_ast(is_val, uop->child, bba, NULL);
         struct Quad q = make_quad(eq_r, LEA, arg1, arg2);
         return append_quad(&bba->arr[bba->len - 1], q);
+    }
     case '*': {
-        // TODO check the type of uop->child to see if its a pointer type
-        struct Location arg2;
-        parse_ast(bba, uop->child, NULL);
-        struct Location arg1 = bba->arr[bba->len - 1].tail->quad.eq;
+        if (uop->child->value_type->type != T_POINTER) {
+            fprintf(stderr, "Can't Deref a non pointer type");
+        }
+        int is_val = parse_ast(bba, uop->child, NULL);
+        struct Location arg1 =
+            get_loc_from_parse_ast(is_val, uop->child, bba, NULL);
         struct Quad q = make_quad(eq_r, LOAD, arg1, arg2);
         return append_quad(&bba->arr[bba->len - 1], q);
     }
     case '+':
+        // IDK what this is supposed to do
+        // I think this is just a noop
         break;
-    case '-':
-        break;
-    case '~':
-        break;
-    case '!':
-        break;
-    case PLUSEQ:
-        break;
-    case MINUSEQ:
-        break;
-    case PLUSPLUS:
-        break;
-    case MINUSMINUS:
-        break;
-    case SIZEOF:
-        break;
+    case '-': {
+        enum Operation op;
+        struct Type *last = get_last_from_next(uop->child->value_type);
+        if (last->type == T_FLOAT || last->type == T_DOUBLE) {
+            op = FMUL;
+        } else {
+            op = MUL;
+        }
+        int is_val = parse_ast(bba, uop->child, NULL);
+        struct Location arg1 =
+            get_loc_from_parse_ast(is_val, uop->child, bba, NULL);
+        struct Quad q = make_quad(eq_r, op, arg1, arg2);
+        return append_quad(&bba->arr[bba->len - 1], q);
+    }
+    case '~': {
+        int is_val = parse_ast(bba, uop->child, NULL);
+        struct Location arg1 =
+            get_loc_from_parse_ast(is_val, uop->child, bba, NULL);
+        struct Quad q = make_quad(eq_r, BINOT, arg1, arg2);
+        return append_quad(&bba->arr[bba->len - 1], q);
+    }
+    case '!': {
+        int is_val = parse_ast(bba, uop->child, NULL);
+        struct Location arg1 =
+            get_loc_from_parse_ast(is_val, uop->child, bba, NULL);
+        struct Quad q = make_quad(eq_r, LOGNOT, arg1, arg2);
+
+        append_quad(&bba->arr[bba->len - 1], q);
+        return;
+    }
+    case PLUSPLUS: {
+        if (eq != NULL) {
+            fprintf(stderr, "Warning: This shouldn't happen, something fishy "
+                            "is going on (PLUSPLUS has eq)");
+        }
+        struct Type *last = get_last_from_next(uop->child->value_type);
+        if (last->type != T_INT && last->type != T_SHORT &&
+            last->type != T_CHAR && last->type != T_LONG &&
+            !is_lvalue(uop->child)) {
+            fprintf(stderr, "Invalid ++ expression\n");
+            exit(3);
+        }
+        int is_val = parse_ast(bba, uop->child, NULL);
+
+        // this isn't efficent since im doing some moving around
+        // but lets pretend im going to have an optimizer that
+        // will fix this
+        fprintf(stderr, "HERE 1\n");
+        struct Quad last_quad;
+        struct Location arg1 =
+            get_loc_from_parse_ast(is_val, uop->child, bba, &last_quad);
+        fprintf(stderr, "HERE 2\n");
+        print_quad(&last_quad);
+        printf("\n");
+        struct Location one_const = make_Location_int(1);
+        // cache
+        struct Location orig_cache = make_Location_reg();
+        struct Quad cache_q = make_quad(orig_cache, MOV, arg1, arg2);
+        append_quad(&bba->arr[bba->len - 1], cache_q);
+        // do the add
+        struct Location origin;
+        if (uop->child->type == ASTNODE_IDENT) {
+            origin = make_Location_var(uop->child->ident);
+        } else {
+            origin = last_quad.arg1;
+            origin.deref = 1;
+        }
+        struct Quad q = make_quad(origin, ADD, arg1, one_const);
+        append_quad(&bba->arr[bba->len - 1], q);
+        // }
+        // move the new value this is dumb but whatever
+        struct Location new_cache = make_Location_reg();
+        struct Quad result = make_quad(new_cache, MOV, orig_cache, arg2);
+        return append_quad(&bba->arr[bba->len - 1], result);
+    }
+    case MINUSMINUS: {
+        if (eq != NULL) {
+            fprintf(stderr, "Warning: This shouldn't happen, something fishy "
+                            "is going on (MINUSMINUS has eq)");
+        }
+        struct Type *last = get_last_from_next(uop->child->value_type);
+        if (last->type != T_INT && last->type != T_SHORT &&
+            last->type != T_CHAR && last->type != T_LONG &&
+            !is_lvalue(uop->child)) {
+            fprintf(stderr, "Invalid ++ expression\n");
+            exit(3);
+        }
+        int is_val = parse_ast(bba, uop->child, NULL);
+
+        // this isn't efficent since im doing some moving around
+        // but lets pretend im going to have an optimizer that
+        // will fix this
+        struct Location arg1 =
+            get_loc_from_parse_ast(is_val, uop->child, bba, NULL);
+        struct Location one_const = make_Location_int(1);
+
+        // cache
+        struct Location orig_cache = make_Location_reg();
+        struct Quad cache_q = make_quad(orig_cache, MOV, arg1, arg2);
+        append_quad(&bba->arr[bba->len - 1], cache_q);
+        // do the add
+        struct Location origin = make_Location_var(uop->child->ident);
+        if (uop->child->type != ASTNODE_IDENT) {
+            origin.deref = 1;
+        }
+        struct Quad q = make_quad(origin, SUB, arg1, one_const);
+        append_quad(&bba->arr[bba->len - 1], q);
+        // move the new value
+        struct Location new_cache = make_Location_reg();
+        struct Quad result = make_quad(new_cache, MOV, orig_cache, arg2);
+        return append_quad(&bba->arr[bba->len - 1], result);
+    }
+    case SIZEOF: {
+        if (uop->child->value_type == NULL) {
+            fprintf(stderr, "Invalid sizeof expression\n");
+            exit(3);
+        }
+        long long size = size_of_abstract(uop->child->value_type);
+        // Don't generate code inside of sizeof
+        struct Location arg1 = make_Location_int(size);
+        struct Quad q = make_quad(eq_r, MOV, arg1, arg2);
+        return append_quad(&bba->arr[bba->len - 1], q);
+    }
     default:
         fprintf(stderr, "Invalid Unary operator %c", (char)uop->op);
         exit(3);
     }
 }
 
-void parse_ast(struct BasicBlockArr *bba, AstNode *ast, struct Location *eq) {
-    struct BasicBlock *bb = &bba->arr[bba->len - 1];
+void parse_binary_op(struct BasicBlockArr *bba, struct BinaryOp *bop,
+                     struct Location *eq) {
+    struct Location eq_r;
+    if (eq == NULL) {
+        eq_r = make_Location_reg();
+    } else {
+        eq_r = *eq;
+    }
+    switch (bop->op) {
+    // deafult math stuff
+    case '+': {
+        if (bop->left->value_type->type == T_POINTER &&
+            bop->right->value_type->type == T_POINTER) {
+            fprintf(stderr, "Can't add two pointers together");
+            exit(3);
+        }
+        if (bop->left->value_type->type == T_POINTER ||
+            bop->right->value_type->type == T_POINTER) {
+            // check to make sure one of them is an integer type also
+            // do pointer arithmatic stuff
+            return;
+        }
+        int is_val = parse_ast(bba, bop->left, NULL);
+        struct Location arg1 =
+            get_loc_from_parse_ast(is_val, bop->left, bba, NULL);
+        is_val = parse_ast(bba, bop->left, NULL);
+        struct Location arg2 =
+            get_loc_from_parse_ast(is_val, bop->right, bba, NULL);
+        enum Types op_type = get_last_from_next(bop->right->value_type)->type;
+        enum Operation op =
+            op_type == T_FLOAT || op_type == T_DOUBLE ? FADD : ADD;
+        struct Quad q = make_quad(eq_r, op, arg1, arg2);
+        return append_quad(&bba->arr[bba->len - 1], q);
+    }
+    case '-':
+        break;
+    case '*':
+        break;
+    case '/':
+        break;
+    case '%':
+        break;
+    case PLUSEQ:
+        break;
+    case MINUSEQ:
+        break;
+    case TIMESEQ:
+        break;
+    case DIVEQ:
+        break;
+    }
+}
+
+int parse_ast(struct BasicBlockArr *bba, AstNode *ast, struct Location *eq) {
     switch (ast->type) {
     case ASTNODE_CONSTANT:
-        fprintf(stderr, "Warning: useless constant");
-        break;
+        return 1;
     case ASTNODE_STRLIT:
-        fprintf(stderr, "Warning: useless Str lit");
         break;
     case ASTNODE_IDENT:
-        fprintf(stderr, "Warning: useless Str lit");
-        break;
+        return 1;
     case ASTNODE_UNARYOP:
-        return parse_unary_op(bba, &ast->unary_op, eq);
+        parse_unary_op(bba, &ast->unary_op, eq);
+        break;
     case ASTNODE_BINARYOP:
+        parse_binary_op(bba, &ast->binary_op, eq);
         break;
     case ASTNODE_TERNAYROP:
         break;
@@ -197,6 +387,8 @@ void parse_ast(struct BasicBlockArr *bba, AstNode *ast, struct Location *eq) {
         break;
     }
     case ASTNODE_DECLARATION:
+        // this is prob a noop
+        // I need to declare all locals at the beg of a fucntion
         break;
     case ASTNODE_IF_STATMENT:
         break;
@@ -220,5 +412,11 @@ void parse_ast(struct BasicBlockArr *bba, AstNode *ast, struct Location *eq) {
         break;
     case ASTNODE_DEFAULT_STATMENT:
         break;
+    case ASTNODE_CAST:
+        // should only have to do something
+        // if I am going from floating point to integer
+        // otherwise noop
+        break;
     }
+    return 0;
 }

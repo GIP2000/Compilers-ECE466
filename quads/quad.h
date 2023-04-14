@@ -11,12 +11,21 @@ typedef unsigned int VReg;
 // ie there is no arg (b = a++ has one arg only) or eq (*d = 1; would not have
 // an eq since its a STORE type command)
 
+enum LocationType {
+    REG,
+    VAR,
+    CONSTINT,
+    CONSTFLOAT,
+};
+
 struct Location {
-    int is_var; // 0 if reg 1 if var
+    enum LocationType loc_type; // 0 if reg 1 if var
     int deref;
     union {
         VReg reg;
         struct SymbolTableNode *var;
+        double const_float;
+        long long const_int;
     };
 };
 
@@ -24,6 +33,22 @@ enum Operation {
     LOAD,
     STORE,
     LEA,
+    MOV,
+    // Math Ops
+    ADD,
+    SUB,
+    MUL,
+    DIV,
+    FADD,
+    FSUB,
+    FMUL,
+    FDIV,
+
+    // BITWISE
+    BINOT,
+
+    // LOGICAL
+    LOGNOT,
 };
 
 struct Quad {
@@ -50,6 +75,12 @@ struct BasicBlockArr {
     size_t len;
 };
 
+struct Location make_Location_int(long long v);
+struct Location make_Location_float(double v);
+struct Location make_Location_reg();
+struct Location make_Location_empty_reg();
+struct Location make_Location_var(struct SymbolTableNode *v);
+
 struct BasicBlockArr initalize_BasicBlockArr(size_t cap);
 void append_basic_block(struct BasicBlockArr *bba, struct BasicBlock bb);
 void print_bba(struct BasicBlockArr *bba);
@@ -61,3 +92,4 @@ struct Quad make_quad(struct Location eq, enum Operation op,
 void append_quad(struct BasicBlock *bb, struct Quad quad);
 void print_quad(struct Quad *q);
 void print_bb(struct BasicBlock *bb, int add_tab);
+void print_location(struct Location *l);

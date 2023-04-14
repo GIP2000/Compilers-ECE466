@@ -1,5 +1,6 @@
 #include "./ast.h"
 #include "../lexer/file_info.h"
+#include "../macro_util.h"
 #include "../parser.tab.h"
 #include "symbol_table.h"
 #include "yylval_types.h"
@@ -20,11 +21,6 @@ int initalized_str = 0;
     (init).qualifier_bit_mask = 0;                                             \
     (init).type = (type_name);                                                 \
     (init).extentions.next_type.next = (next_type_val);
-
-#define PTR_RETURN(ptr, value)                                                 \
-    if ((ptr) != NULL) {                                                       \
-        *(ptr) = value;                                                        \
-    }
 
 AstNode *make_AstNode(int type) {
     AstNode *node = (AstNode *)malloc(sizeof(AstNode));
@@ -137,8 +133,82 @@ int get_long_len(struct Type *t, int *has_unsigned) {
     return i - signed_count;
 }
 
+int types_are_eq(struct Type *left, struct Type *right) {
+    struct Type *cur_left;
+    struct Type *cur_right;
+    for (cur_left = left, cur_right = right;
+         (cur_left != NULL && cur_left->type >= T_POINTER &&
+          cur_left->type <= T_TYPEDEF) &&
+         (cur_right != NULL && cur_right->type >= T_POINTER &&
+          cur_right->type <= T_TYPEDEF);
+         cur_left = cur_left->extentions.next_type.next,
+        cur_right = cur_right->extentions.next_type.next) {
+        if (cur_left->type != cur_right->type) {
+            return 0;
+        }
+    }
+    if (cur_right == NULL && cur_left == NULL)
+        return 1;
+    if (cur_right != NULL && cur_left != NULL &&
+        cur_right->type == cur_left->type) {
+        return 1;
+    }
+    return 0;
+}
+
+struct Type *pointer_arithmatic_res_type(struct Type *left, struct Type *right,
+                                         int *left_needs_cast,
+                                         int *right_needs_cast) {
+    if (left->type == T_POINTER && right->type == T_POINTER) {
+        if (types_are_eq(left, right)) {
+            PTR_RETURN(left_needs_cast, 0)
+            PTR_RETURN(right_needs_cast, 0)
+            return left;
+        }
+        return NULL;
+    }
+
+    struct Type *ptr;
+    struct Type *must_be_int;
+    int *ptr_needs_cast;
+    int *int_needs_cast;
+
+    if (left->type == T_POINTER) {
+        ptr = left;
+        must_be_int = right;
+        ptr_needs_cast = left_needs_cast;
+        int_needs_cast = right_needs_cast;
+    } else {
+        ptr = right;
+        must_be_int = left;
+        ptr_needs_cast = right_needs_cast;
+        int_needs_cast = left_needs_cast;
+    }
+
+    // make sure must_be_int is a ptr
+    enum Types itype = get_last_from_next(must_be_int)->type;
+    if (itype != T_INT && itype != T_SHORT && itype != T_CHAR) {
+        return NULL;
+    }
+
+    PTR_RETURN(int_needs_cast, must_be_int->type != T_INT);
+    PTR_RETURN(ptr_needs_cast, 0);
+    return ptr;
+}
+
 struct Type *arithmatic_res_type(struct Type *left, struct Type *right,
-                                 int *left_needs_cast, int *right_needs_cast) {
+                                 int allow_pointer, int *left_needs_cast,
+                                 int *right_needs_cast) {
+    if (left->type == T_POINTER || right->type == T_POINTER) {
+        if (!allow_pointer) {
+            yyerror("Pointer type can'd do this arithmetic op");
+            exit(2);
+        }
+        PTR_RETURN(left_needs_cast, 0)
+        PTR_RETURN(right_needs_cast, 0)
+        return pointer_arithmatic_res_type(left, right, left_needs_cast,
+                                           right_needs_cast);
+    }
     if (!type_can_do_math(left) || !type_can_do_math(right)) {
         return NULL;
     }
@@ -201,8 +271,13 @@ AstNode *make_binary_op(int op, AstNode *left, AstNode *right) {
         op == PLUSEQ || op == MINUSEQ || op == TIMESEQ || op == DIVEQ) {
         int left_cast;
         int right_cast;
-        ast->value_type = arithmatic_res_type(
-            left->value_type, right->value_type, &left_cast, &right_cast);
+        if ((ast->value_type = arithmatic_res_type(
+                 left->value_type, right->value_type,
+                 op == '+' || op == '-' || op == PLUSEQ || op == MINUSEQ,
+                 &left_cast, &right_cast)) == NULL) {
+            yyerror("Invalid arugment for math expression");
+            exit(2);
+        };
         // add the cast in there
         if (left_cast) {
             bo->left =
@@ -229,7 +304,7 @@ AstNode *make_binary_op(int op, AstNode *left, AstNode *right) {
         int left_cast;
         int right_cast;
         ast->value_type = arithmatic_res_type(
-            left->value_type, right->value_type, &left_cast, &right_cast);
+            left->value_type, right->value_type, 0, &left_cast, &right_cast);
         // add the cast in there
         if (left_cast) {
             bo->left =
@@ -263,51 +338,27 @@ AstNode *make_binary_op(int op, AstNode *left, AstNode *right) {
         return ast;
 
     if (op == '=') {
-        struct Type *left_type;
-        struct Type *right_type;
-        int entered = 0;
-        for (left_type = left->value_type, right_type = right->value_type;
-             (left_type->type >= T_POINTER && left_type->type <= T_TYPEDEF) &&
-             (right_type->type >= T_POINTER && right_type->type <= T_TYPEDEF);
-             left_type = left_type->extentions.next_type.next,
-            right_type = right_type->extentions.next_type.next) {
-            entered = 1;
-            if (left_type->type != right_type->type) {
-                yyerror("Assignment operator types don't match");
-                exit(2);
-            }
+        if (types_are_eq(left->value_type, right->value_type)) {
+            ast->value_type = left->value_type;
+            return ast;
         }
-
-        if ((left_type->type >= T_POINTER && left_type->type <= T_TYPEDEF) ||
-            (right_type->type >= T_POINTER && right_type->type <= T_TYPEDEF)) {
-            // if we didnt' enter
-            // check if we can do a math cast
-            if (!type_can_do_math(left->value_type) ||
-                !type_can_do_math(right->value_type)) {
-                yyerror("Assignment operator types don't match");
+        if (type_can_do_math(left->value_type) &&
+            type_can_do_math(right->value_type)) {
+            int left_cast, right_cast;
+            struct Type *res =
+                arithmatic_res_type(left->value_type, right->value_type, 1,
+                                    &left_cast, &right_cast);
+            if (res == NULL || left_cast) {
+                yyerror("Invalid assignment operator");
                 exit(2);
-            }
-            int right_cast;
-            int left_cast;
-            struct Type *type = arithmatic_res_type(
-                left->value_type, right->value_type, &left_cast, &right_cast);
-
-            if (type == NULL) {
-                yyerror("Assignment operator types don't match");
-                exit(2);
-            }
-            if (left_cast) {
-                bo->left =
-                    make_CastStatment(left, make_Typename(right->value_type));
             }
             if (right_cast) {
                 bo->right =
                     make_CastStatment(right, make_Typename(left->value_type));
             }
-            ast->value_type = type;
+            ast->value_type = left->value_type;
+            return ast;
         }
-        ast->value_type = left->value_type;
-        return ast;
     }
     fprintf(stderr, "Unsuportted op = %d", op);
     exit(1);
@@ -318,10 +369,23 @@ AstNode *make_unary_op(int op, AstNode *child) {
     struct UnaryOp *uo = &ast->unary_op;
     uo->op = op;
     uo->child = child;
+
     switch (op) {
-    case '&':
-        // all will pass now. I check for lvalue before I do quads
-        break;
+    case '*': {
+        if (child->value_type->type != T_POINTER) {
+            yyerror("Invalid Argument to Dref Operator");
+            exit(2);
+        }
+        ast->value_type = child->value_type->extentions.next_type.next;
+        return ast;
+    }
+    case '&': {
+        // this will never be freed should likely make an allocator or something
+        // if I was concerned with that. But we'll leak for now
+        struct Type *ptr = make_next_type(T_POINTER, child->value_type);
+        ast->value_type = ptr;
+        return ast;
+    } break;
     case '+':
         if (!type_can_do_math(child->value_type)) {
             yyerror("Invalid Argument to +");

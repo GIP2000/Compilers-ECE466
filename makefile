@@ -25,7 +25,7 @@ ast.o: parser/ast.c parser/ast.h
 	gcc $(FLAGS) -c parser/ast.c -o ast.o
 
 lex.o: lex.yy.c
-	gcc $(FLAGS) lex.yy.c -c -o lex.o
+	gcc lex.yy.c -c -o lex.o
 
 lex_test.o: lexer/lexer_test.c
 	gcc $(FLAGS) -c lexer/lexer_test.c -o lex_test.o
