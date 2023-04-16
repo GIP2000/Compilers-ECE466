@@ -14,6 +14,7 @@ extern int yylineno;
 extern struct SymbolTable *symbol_table;
 
 struct Type TTUCHAR;
+struct Type TTULONG;
 int initalized = 0;
 int initalized_str = 0;
 
@@ -21,6 +22,14 @@ int initalized_str = 0;
     (init).qualifier_bit_mask = 0;                                             \
     (init).type = (type_name);                                                 \
     (init).extentions.next_type.next = (next_type_val);
+
+void promote_arr(AstNode *arr) {
+    if (arr->value_type->type == T_ARR) {
+        struct Type *ptr = make_next_type(
+            T_POINTER, arr->value_type->extentions.next_type.next);
+        arr->value_type = ptr;
+    }
+}
 
 AstNode *make_AstNode(int type) {
     AstNode *node = (AstNode *)malloc(sizeof(AstNode));
@@ -37,7 +46,6 @@ AstNode *make_ConstantType(YYlvalNumLit numlit) {
     static struct Type TTLONG;
     static struct Type TTLONGLONG;
     static struct Type TTUINT;
-    static struct Type TTULONG;
     static struct Type TTULONGLONG;
     static struct Type TTDOUBLE;
     static struct Type TTFLOAT;
@@ -163,7 +171,7 @@ struct Type *pointer_arithmatic_res_type(struct Type *left, struct Type *right,
         if (types_are_eq(left, right)) {
             PTR_RETURN(left_needs_cast, 0)
             PTR_RETURN(right_needs_cast, 0)
-            return left;
+            return &TTULONG;
         }
         return NULL;
     }
@@ -204,8 +212,6 @@ struct Type *arithmatic_res_type(struct Type *left, struct Type *right,
             yyerror("Pointer type can'd do this arithmetic op");
             exit(2);
         }
-        PTR_RETURN(left_needs_cast, 0)
-        PTR_RETURN(right_needs_cast, 0)
         return pointer_arithmatic_res_type(left, right, left_needs_cast,
                                            right_needs_cast);
     }
@@ -265,10 +271,12 @@ AstNode *make_binary_op(int op, AstNode *left, AstNode *right) {
     bo->op = op;
     bo->left = left;
     bo->right = right;
+    promote_arr(bo->left);
+    promote_arr(bo->right);
 
     // math binary ops
-    if (op == '+' || op == '-' || op == '*' || op == '/' || op == '%' ||
-        op == PLUSEQ || op == MINUSEQ || op == TIMESEQ || op == DIVEQ) {
+    if (op == '+' || op == '-' || op == '*' || op == '/' || op == PLUSEQ ||
+        op == MINUSEQ || op == TIMESEQ || op == DIVEQ) {
         int left_cast;
         int right_cast;
         if ((ast->value_type = arithmatic_res_type(
@@ -292,7 +300,7 @@ AstNode *make_binary_op(int op, AstNode *left, AstNode *right) {
     }
     // Integer only
     if (op == '%' || op == EQEQ || op == NOTEQ || op == '<' || op == LTEQ ||
-        op == '<' || op == GTEQ || op == LOGAND || op == LOGOR || op == MODEQ ||
+        op == '>' || op == GTEQ || op == LOGAND || op == LOGOR || op == MODEQ ||
         op == SHLEQ || op == SHREQ || op == ANDEQ || op == XOREQ ||
         op == OREQ || op == '&' || op == '|' || op == '^' || op == SHL ||
         op == SHR) {
@@ -377,6 +385,7 @@ AstNode *make_unary_op(int op, AstNode *child) {
             exit(2);
         }
         ast->value_type = child->value_type->extentions.next_type.next;
+        promote_arr(ast);
         return ast;
     }
     case '&': {
@@ -436,12 +445,16 @@ AstNode *make_unary_op(int op, AstNode *child) {
         break;
     case SIZEOF:
         // let everything through for now
+        // don't promote array
+        ast->value_type = child->value_type;
+        return ast;
         break;
     default:
         fprintf(stderr, "UNREACHABLE\n");
         exit(1);
     }
     ast->value_type = child->value_type;
+    promote_arr(ast);
     return ast;
 }
 

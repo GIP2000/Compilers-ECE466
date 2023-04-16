@@ -11,12 +11,7 @@ typedef unsigned int VReg;
 // ie there is no arg (b = a++ has one arg only) or eq (*d = 1; would not have
 // an eq since its a STORE type command)
 
-enum LocationType {
-    REG,
-    VAR,
-    CONSTINT,
-    CONSTFLOAT,
-};
+enum LocationType { REG, VAR, CONSTINT, CONSTFLOAT, BASICBLOCKNUM };
 
 struct Location {
     enum LocationType loc_type; // 0 if reg 1 if var
@@ -24,8 +19,9 @@ struct Location {
     union {
         VReg reg;
         struct SymbolTableNode *var;
-        double const_float;
+        long double const_float;
         long long const_int;
+        size_t bbn;
     };
 };
 
@@ -43,13 +39,56 @@ enum Operation {
     FSUB,
     FMUL,
     FDIV,
+    MOD,
 
     // BITWISE
     BINOT,
+    BIAND,
+    BIOR,
+    BIXOR,
+    BISHL,
+    BISHR,
 
     // LOGICAL
+    CMP,
+
+    // branch
+    BREQ,  // 0  0
+    BRNEQ, // 1  2
+    BRLT,  // 2  4
+    BRLE,  // 3  6
+    BRGT,  // 4  8
+    BRGE,  // 5 10
+
+    BREQU,  // 0  1
+    BRNEQU, // 1  3
+    BRLTU,  // 2  5
+    BRLEU,  // 3  7
+    BRGTU,  // 4  9
+    BRGEU,  // 5 11
+
+    // get rvalue
+    CCEQ,  // 0  0
+    CCNEQ, // 1  2
+    CCLT,  // 2  4
+    CCLE,  // 3  6
+    CCGT,  // 4  8
+    CCGE,  // 5 10
+
+    CCEQU,  // 0  1
+    CCNEQU, // 1  3
+    CCLTU,  // 2  5
+    CCLEU,  // 3  7
+    CCGTU,  // 4  9
+    CCGEU,  // 5 11
+
+    //
     LOGNOT,
 };
+
+#define CMPLEN 6
+
+typedef int OpInverter[6];
 
 struct Quad {
     struct Location eq;
@@ -76,10 +115,11 @@ struct BasicBlockArr {
 };
 
 struct Location make_Location_int(long long v);
-struct Location make_Location_float(double v);
+struct Location make_Location_float(long double v);
 struct Location make_Location_reg();
 struct Location make_Location_empty_reg();
 struct Location make_Location_var(struct SymbolTableNode *v);
+struct Location make_Location_BB(size_t bbn);
 
 struct BasicBlockArr initalize_BasicBlockArr(size_t cap);
 void append_basic_block(struct BasicBlockArr *bba, struct BasicBlock bb);
@@ -89,7 +129,7 @@ struct BasicBlock make_bb(struct SymbolTableNode *ref);
 
 struct Quad make_quad(struct Location eq, enum Operation op,
                       struct Location arg1, struct Location arg2);
-void append_quad(struct BasicBlock *bb, struct Quad quad);
+struct Quad *append_quad(struct BasicBlock *bb, struct Quad quad);
 void print_quad(struct Quad *q);
 void print_bb(struct BasicBlock *bb, int add_tab);
 void print_location(struct Location *l);

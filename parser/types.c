@@ -5,8 +5,9 @@
 
 extern void yyerror(char *);
 
-const SIZEOF_TABLE TYPE_SIZE_TABLE = {0, 0, 2,  4, 1, 4,  8,  8, 0,
-                                      0, 8, -1, 0, 0, -1, -1, 4};
+const SIZEOF_TABLE TYPE_SIZE_TABLE = //{0, 0, 2,  4, 1, 4,  8,  8, 0,
+                                     // 0, 8, -1, 0, 0, -1, -1, 4};
+    {0, 0, 1, 2, 4, 4, 8, 8, 0, 0, 8, -1, 0, 0, -1, -1, 4};
 
 int types_eq(struct Type *t1, struct Type *t2) {
     if (t1->type != t2->type) {
@@ -188,6 +189,7 @@ struct Type *make_next_type(enum Types type, struct Type *next) {
     }
 
     type_obj->extentions.next_type.next = next;
+    type_obj->extentions.next_type.arr_size_expression = NULL;
     return type_obj;
 }
 
@@ -404,12 +406,15 @@ void print_type_i(struct Type *type, int prev_pointer) {
     }
 
     if (type->type == T_STRUCT && !prev_pointer) {
-        printf(" members: (");
+
+        printf(" size: %lld members: (", type->extentions.st_un.cached_size);
         size_t i;
         for (i = 0; i < type->extentions.st_un.mem->len; ++i) {
             print_type_i(type->extentions.st_un.mem->nodearr[i]->val.type, 0);
             if (type->extentions.st_un.mem->nodearr[i]->name != NULL) {
-                printf(" %s", type->extentions.st_un.mem->nodearr[i]->name);
+                printf(" %s offset = %lld",
+                       type->extentions.st_un.mem->nodearr[i]->name,
+                       type->extentions.st_un.mem->nodearr[i]->offset);
             }
             printf(", ");
         }

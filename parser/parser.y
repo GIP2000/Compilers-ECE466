@@ -168,14 +168,31 @@ postfix_expression: primary_expression
                       $$ = make_func_call($1, NULL);
                   }
                   | postfix_expression  '.' IDENT {
+                      if($1->value_type->type != T_STRUCT || $1->value_type->type == T_UNION) {
+                        yyerror("Invalid . operator must be used with a struct or union");
+                        exit(2);
+                      }
+                      struct SymbolTable * old = symbol_table;
+                      symbol_table = $1->value_type->extentions.st_un.mem;
                       $$ = make_binary_op('.', $1, make_IdentNode($3));
+                      symbol_table = old;
                       /* $$ = make_binary_op('.', $1, make_IdentNode($<str>3)); */
                   }
                   | postfix_expression INDSEL IDENT {
-                    AstNode * deref = make_unary_op('*', $1);
-                    AstNode * ident = make_IdentNode($3);
+                      if($1->value_type->type != T_POINTER &&
+                          ($1->value_type->extentions.next_type.next->type == T_STRUCT
+                            || $1->value_type->extentions.next_type.next->type == T_UNION )) {
+                        yyerror("Invalid . operator must be used with a struct or union");
+                        exit(2);
+                      }
+                    struct SymbolTable * old = symbol_table;
+                    symbol_table = $1->value_type->extentions.next_type.next->extentions.st_un.mem;
+                    $$ = make_binary_op(INDSEL, $1, make_IdentNode($3));
+                    symbol_table = old;
+                    /* AstNode * deref = make_unary_op('*', $1); */
+                    /* AstNode * ident = make_IdentNode($3); */
                     /* AstNode * ident = make_IdentNode($<str>3); */
-                    $$ = make_binary_op('.', deref, ident);
+                    /* $$ = make_binary_op('.', deref, ident); */
                   }
                   | postfix_expression PLUSPLUS {
                       $$ = make_unary_op(PLUSPLUS, $1);
@@ -462,7 +479,9 @@ init_declarator_list: init_declarator {
                         /*     shallow_pop_table(); */
                         /* } */
                         struct SymbolTableNode *n = $1->statments.head->node->declaration.symbol;
-                        struct Type * t = add_to_end_and_reverse($3.val.type, n->val.type);
+                        struct Type * t_to_add;
+                        for(t_to_add = n->val.type; t_to_add != NULL && (t_to_add->type == T_POINTER || t_to_add->type == T_ARR); t_to_add = t_to_add->extentions.next_type.next) {}
+                        struct Type * t = add_to_end_and_reverse($3.val.type, t_to_add);
                         struct SymbolTableNode node = make_st_node($3.name, $3.namespc, $3.type, n->val.sc, t,$3.val.initalizer);
                         if(!enter_in_namespace(node, ORD)) { //TODO ord is Temporary
                            yyerror("Varaible redefinition");
@@ -663,6 +682,7 @@ alignment_specifier: _ALIGNAS '(' type_name ')' {
 
 // 6.7.6
 declarator: pointer direct_declarator {
+
           if($2.node.val.type != NULL) {
             struct Type * t = $2.node.val.type->type == T_FUNC ? $2.node.val.type : get_last_from_next($2.node.val.type);
             if (t->type == T_FUNC) {
@@ -705,6 +725,7 @@ direct_declarator: IDENT {
                  | direct_declarator '[' assignment_expression ']' {
                     /* $1.val.type = merge_if_next($1.val.type, make_next_type(T_ARR, NULL)); */
                     $1.node.val.type = make_next_type(T_ARR, $1.node.val.type);
+                    $1.node.val.type->extentions.next_type.arr_size_expression = $3;
                     $$ = $1;
                  }
                  | direct_declarator '[' ']' {
@@ -854,7 +875,6 @@ abstract_declarator: pointer {
                       }
                    }// Optional
                    | direct_abstract_declarator {
-                       fprintf(stderr, "No pointer\n");
                        $$ = $1;
                    }
                    ;

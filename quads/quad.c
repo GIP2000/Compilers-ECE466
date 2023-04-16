@@ -12,11 +12,18 @@ struct Location make_Location_int(long long v) {
     l.const_int = v;
     return l;
 }
-struct Location make_Location_float(double v) {
+struct Location make_Location_BB(size_t bbn) {
+    struct Location l;
+    l.loc_type = BASICBLOCKNUM;
+    l.deref = 0;
+    l.bbn = bbn;
+    return l;
+}
+struct Location make_Location_float(long double v) {
     struct Location l;
     l.loc_type = CONSTFLOAT;
     l.deref = 0;
-    l.const_int = v;
+    l.const_float = v;
     return l;
 }
 struct Location make_Location_reg() {
@@ -80,7 +87,7 @@ struct Quad make_quad(struct Location eq, enum Operation op,
     return q;
 }
 
-void append_quad(struct BasicBlock *bb, struct Quad quad) {
+struct Quad *append_quad(struct BasicBlock *bb, struct Quad quad) {
     struct QuadListNode *qn =
         (struct QuadListNode *)malloc(sizeof(struct QuadListNode));
     qn->quad = quad;
@@ -91,6 +98,7 @@ void append_quad(struct BasicBlock *bb, struct Quad quad) {
         bb->tail->next = qn;
     }
     bb->tail = qn;
+    return &bb->tail->quad;
 }
 
 void print_location(struct Location *loc) {
@@ -101,8 +109,10 @@ void print_location(struct Location *loc) {
     else if (loc->loc_type == CONSTINT)
         printf("%lld", loc->const_int);
     else if (loc->loc_type == CONSTFLOAT)
-        printf("%f", loc->const_float);
-    else if (loc->reg != EMPTY_VREG)
+        printf("%Lg", loc->const_float);
+    else if (loc->loc_type == BASICBLOCKNUM) {
+        printf("BB%zu", loc->bbn);
+    } else if (loc->reg != EMPTY_VREG)
         printf("%%T%04d", loc->reg);
     if (loc->deref)
         printf("]");
@@ -156,6 +166,99 @@ void print_op(enum Operation op) {
     // LOGICAL
     case LOGNOT:
         printf("LOGNOT");
+        break;
+    case MOD:
+        printf("MOD");
+        break;
+    case BIAND:
+        printf("BIAND");
+        break;
+    case BIOR:
+        printf("BIOR");
+        break;
+    case BIXOR:
+        printf("BIXOR");
+        break;
+    case BISHL:
+        printf("BISHL");
+        break;
+    case BISHR:
+        printf("BISHR");
+        break;
+    case CMP:
+        printf("CMP");
+        break;
+    case BREQ:
+        printf("BREQ");
+        break;
+    case BREQU:
+        printf("BREQU");
+        break;
+    case BRNEQ:
+        printf("BRNEQ");
+        break;
+    case BRNEQU:
+        printf("BRNEQU");
+        break;
+    case BRLT:
+        printf("BRLT");
+        break;
+    case BRLTU:
+        printf("BRLTU");
+        break;
+    case BRLE:
+        printf("BRLE");
+        break;
+    case BRLEU:
+        printf("BRLEU");
+        break;
+    case BRGT:
+        printf("BRGT");
+        break;
+    case BRGTU:
+        printf("BRGTU");
+        break;
+    case BRGE:
+        printf("BRGE");
+        break;
+    case BRGEU:
+        printf("BRGEU");
+        break;
+    case CCEQ:
+        printf("CCEQ");
+        break;
+    case CCEQU:
+        printf("CCEQU");
+        break;
+    case CCNEQ:
+        printf("CCNEQ");
+        break;
+    case CCNEQU:
+        printf("CCNEQU");
+        break;
+    case CCLT:
+        printf("CCLT");
+        break;
+    case CCLTU:
+        printf("CCLTU");
+        break;
+    case CCLE:
+        printf("CCLE");
+        break;
+    case CCLEU:
+        printf("CCLEU");
+        break;
+    case CCGT:
+        printf("CCGT");
+        break;
+    case CCGTU:
+        printf("CCGTU");
+        break;
+    case CCGE:
+        printf("CCGE");
+        break;
+    case CCGEU:
+        printf("CCGEU");
         break;
     }
 }
