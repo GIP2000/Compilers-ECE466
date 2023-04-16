@@ -51,6 +51,7 @@ enum Operation {
 
     // LOGICAL
     CMP,
+    BR,
 
     // branch
     BREQ,  // 0  0
@@ -83,6 +84,7 @@ enum Operation {
     CCGEU,  // 5 11
 
     //
+
     LOGNOT,
 };
 

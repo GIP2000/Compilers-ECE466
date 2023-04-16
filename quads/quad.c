@@ -260,6 +260,9 @@ void print_op(enum Operation op) {
     case CCGEU:
         printf("CCGEU");
         break;
+    case BR:
+        printf("BR");
+        break;
     }
 }
 

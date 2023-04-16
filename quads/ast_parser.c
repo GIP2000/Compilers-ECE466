@@ -672,13 +672,10 @@ void parse_binary_op(struct BasicBlockArr *bba, struct BinaryOp *bop,
         return;
     }
     case LOGOR: {
-        fprintf(stderr, "LOG OR\n");
         enum Operation op = get_op_from_child(bba, bop->left);
-        fprintf(stderr, "got op %d\n", op);
         if (op >= BRGEU) {
             op -= CMPLEN * 2;
         }
-        fprintf(stderr, "after op %d\n", op);
         // now op is a branch
         struct Quad q =
             make_quad(make_Location_empty_reg(), op, make_Location_BB(bba->len),
@@ -690,19 +687,21 @@ void parse_binary_op(struct BasicBlockArr *bba, struct BinaryOp *bop,
         }
         q = make_quad(make_Location_empty_reg(), op, make_Location_BB(bba->len),
                       make_Location_empty_reg());
-        append_quad(&bba->arr[bba->len - 1], q);
+        struct Quad *first_branch = append_quad(&bba->arr[bba->len - 1], q);
         q = make_quad(eq_r, MOV, make_Location_int(0),
                       make_Location_empty_reg());
         append_quad(&bba->arr[bba->len - 1], q);
         q = make_quad(make_Location_empty_reg(), op,
                       make_Location_BB(bba->len + 1),
                       make_Location_empty_reg());
-        append_quad(&bba->arr[bba->len - 1], q);
+        struct Quad *second_branch = append_quad(&bba->arr[bba->len - 1], q);
         append_basic_block(bba, make_bb(NULL));
+        first_branch->arg1.bbn = bba->len - 1;
         q = make_quad(eq_r, MOV, make_Location_int(1),
                       make_Location_empty_reg());
         append_quad(&bba->arr[bba->len - 1], q);
         append_basic_block(bba, make_bb(NULL));
+        second_branch->arg1.bbn = bba->len - 1;
         return;
     }
     default: {
@@ -752,6 +751,75 @@ void parse_binary_op(struct BasicBlockArr *bba, struct BinaryOp *bop,
     }
 }
 
+void fall_through_if_statment(struct BasicBlockArr *bba,
+                              struct IfStatment *if_s) {
+
+    enum Operation op = invert_cmp(get_op_from_child(bba, if_s->cmp));
+    if (op >= BRGEU) {
+        op -= CMPLEN * 2;
+    }
+    struct Quad q =
+        make_quad(make_Location_empty_reg(), op, make_Location_BB(bba->len),
+                  make_Location_empty_reg());
+    struct Quad *first_branch = append_quad(&bba->arr[bba->len - 1], q);
+    parse_ast(bba, if_s->statment, NULL);
+    append_basic_block(bba, make_bb(NULL));
+    first_branch->arg1.bbn = bba->len - 1;
+}
+
+void parse_while_statment(struct BasicBlockArr *bba,
+                          struct WhileStatment *while_s) {
+    struct Quad *branch_to_cmp_q = NULL;
+    if (!while_s->is_do) {
+        // if it isn't a do add a branch to the cmp
+        struct Quad q =
+            make_quad(make_Location_empty_reg(), BR, make_Location_BB(bba->len),
+                      make_Location_empty_reg());
+        branch_to_cmp_q = append_quad(&bba->arr[bba->len - 1], q);
+    }
+    append_basic_block(bba, make_bb(NULL));
+    size_t body_bbn = bba->len - 1;
+    parse_ast(bba, while_s->statment, NULL);
+    append_basic_block(bba, make_bb(NULL));
+    if (branch_to_cmp_q != NULL) {
+        branch_to_cmp_q->arg1.bbn = bba->len - 1;
+    }
+    enum Operation op = get_op_from_child(bba, while_s->cmp);
+    if (op >= BRGEU) {
+        op -= CMPLEN * 2;
+    }
+    struct Quad branc_q =
+        make_quad(make_Location_empty_reg(), op, make_Location_BB(body_bbn),
+                  make_Location_empty_reg());
+    append_quad(&bba->arr[bba->len - 1], branc_q);
+    append_basic_block(bba, make_bb(NULL));
+}
+
+void parse_for_loop(struct BasicBlockArr *bba, struct ForStatment *for_s) {}
+
+void parse_if_statment(struct BasicBlockArr *bba, struct IfStatment *if_s) {
+    if (if_s->else_statment == NULL) {
+        return fall_through_if_statment(bba, if_s);
+    }
+    enum Operation op = get_op_from_child(bba, if_s->cmp);
+    if (op >= BRGEU) {
+        op -= CMPLEN * 2;
+    }
+    struct Quad q =
+        make_quad(make_Location_empty_reg(), op, make_Location_BB(bba->len),
+                  make_Location_empty_reg());
+    struct Quad *branch_to_if = append_quad(&bba->arr[bba->len - 1], q);
+    parse_ast(bba, if_s->else_statment, NULL);
+    q = make_quad(make_Location_empty_reg(), BR, make_Location_BB(bba->len),
+                  make_Location_empty_reg());
+    struct Quad *branch_to_end = append_quad(&bba->arr[bba->len - 1], q);
+    append_basic_block(bba, make_bb(NULL));
+    branch_to_if->arg1.bbn = bba->len - 1;
+    parse_ast(bba, if_s->statment, NULL);
+    append_basic_block(bba, make_bb(NULL));
+    branch_to_end->arg1.bbn = bba->len - 1;
+}
+
 int parse_ast(struct BasicBlockArr *bba, AstNode *ast, struct Location *eq) {
     switch (ast->type) {
     case ASTNODE_CONSTANT:
@@ -785,10 +853,13 @@ int parse_ast(struct BasicBlockArr *bba, AstNode *ast, struct Location *eq) {
         // I need to declare all locals at the beg of a fucntion
         break;
     case ASTNODE_IF_STATMENT:
+        parse_if_statment(bba, &ast->if_statment);
         break;
     case ASTNODE_FOR_STATMENT:
+        parse_for_loop(bba, &ast->for_statment);
         break;
     case ASTNODE_WHILE_STATMENT:
+        parse_while_statment(bba, &ast->while_statment);
         break;
     case ASTNODE_GOTO_STATMENT:
         break;
