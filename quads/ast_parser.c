@@ -12,6 +12,8 @@ u64 size_of_abstract(struct Type *t);
 u64 get_struct_size(struct Type *t);
 u64 get_union_size(struct Type *t);
 
+#define CURRENT_BB bba->arr[bba->len - 1]
+
 u64 get_struct_or_union_size(struct Type *t) {
     if (t->extentions.st_un.is_cached)
         return t->extentions.st_un.cached_size;
@@ -171,8 +173,8 @@ struct Location get_loc_from_parse_ast(int is_val, AstNode *node,
 
 outside:
 
-    if (out_quad != NULL && bba->arr[bba->len - 1].tail != NULL) {
-        *out_quad = bba->arr[bba->len - 1].tail->quad;
+    if (out_quad != NULL && CURRENT_BB.tail != NULL) {
+        *out_quad = CURRENT_BB.tail->quad;
     }
 
     return result;
@@ -199,7 +201,7 @@ void parse_unary_op(struct BasicBlockArr *bba, struct UnaryOp *uop,
         struct Location arg1 =
             get_loc_from_parse_ast(is_val, uop->child, bba, NULL);
         struct Quad q = make_quad(eq_r, LEA, arg1, arg2);
-        append_quad(&bba->arr[bba->len - 1], q);
+        append_quad(&CURRENT_BB, q);
         return;
     }
     case '*': {
@@ -210,7 +212,7 @@ void parse_unary_op(struct BasicBlockArr *bba, struct UnaryOp *uop,
         struct Location arg1 =
             get_loc_from_parse_ast(is_val, uop->child, bba, NULL);
         struct Quad q = make_quad(eq_r, LOAD, arg1, arg2);
-        append_quad(&bba->arr[bba->len - 1], q);
+        append_quad(&CURRENT_BB, q);
         return;
     }
     case '+':
@@ -229,7 +231,7 @@ void parse_unary_op(struct BasicBlockArr *bba, struct UnaryOp *uop,
         struct Location arg1 =
             get_loc_from_parse_ast(is_val, uop->child, bba, NULL);
         struct Quad q = make_quad(eq_r, op, arg1, arg2);
-        append_quad(&bba->arr[bba->len - 1], q);
+        append_quad(&CURRENT_BB, q);
         return;
     }
     case '~': {
@@ -237,7 +239,7 @@ void parse_unary_op(struct BasicBlockArr *bba, struct UnaryOp *uop,
         struct Location arg1 =
             get_loc_from_parse_ast(is_val, uop->child, bba, NULL);
         struct Quad q = make_quad(eq_r, BINOT, arg1, arg2);
-        append_quad(&bba->arr[bba->len - 1], q);
+        append_quad(&CURRENT_BB, q);
         return;
     }
     case '!': {
@@ -246,7 +248,7 @@ void parse_unary_op(struct BasicBlockArr *bba, struct UnaryOp *uop,
             get_loc_from_parse_ast(is_val, uop->child, bba, NULL);
         struct Quad q = make_quad(eq_r, LOGNOT, arg1, arg2);
 
-        append_quad(&bba->arr[bba->len - 1], q);
+        append_quad(&CURRENT_BB, q);
         return;
     }
     case PLUSPLUS: {
@@ -273,7 +275,7 @@ void parse_unary_op(struct BasicBlockArr *bba, struct UnaryOp *uop,
         // cache
         struct Location orig_cache = make_Location_reg();
         struct Quad cache_q = make_quad(orig_cache, MOV, arg1, arg2);
-        append_quad(&bba->arr[bba->len - 1], cache_q);
+        append_quad(&CURRENT_BB, cache_q);
         // do the add
         struct Location origin;
         if (uop->child->type == ASTNODE_IDENT) {
@@ -283,12 +285,12 @@ void parse_unary_op(struct BasicBlockArr *bba, struct UnaryOp *uop,
             origin.deref = 1;
         }
         struct Quad q = make_quad(origin, ADD, arg1, one_const);
-        append_quad(&bba->arr[bba->len - 1], q);
+        append_quad(&CURRENT_BB, q);
         // }
         // move the new value this is dumb but whatever
         struct Location new_cache = make_Location_reg();
         struct Quad result = make_quad(new_cache, MOV, orig_cache, arg2);
-        append_quad(&bba->arr[bba->len - 1], result);
+        append_quad(&CURRENT_BB, result);
         return;
     }
     case MINUSMINUS: {
@@ -315,18 +317,18 @@ void parse_unary_op(struct BasicBlockArr *bba, struct UnaryOp *uop,
         // cache
         struct Location orig_cache = make_Location_reg();
         struct Quad cache_q = make_quad(orig_cache, MOV, arg1, arg2);
-        append_quad(&bba->arr[bba->len - 1], cache_q);
+        append_quad(&CURRENT_BB, cache_q);
         // do the add
         struct Location origin = make_Location_var(uop->child->ident);
         if (uop->child->type != ASTNODE_IDENT) {
             origin.deref = 1;
         }
         struct Quad q = make_quad(origin, SUB, arg1, one_const);
-        append_quad(&bba->arr[bba->len - 1], q);
+        append_quad(&CURRENT_BB, q);
         // move the new value
         struct Location new_cache = make_Location_reg();
         struct Quad result = make_quad(new_cache, MOV, orig_cache, arg2);
-        append_quad(&bba->arr[bba->len - 1], result);
+        append_quad(&CURRENT_BB, result);
         return;
     }
     case SIZEOF: {
@@ -338,7 +340,7 @@ void parse_unary_op(struct BasicBlockArr *bba, struct UnaryOp *uop,
         // Don't generate code inside of sizeof
         struct Location arg1 = make_Location_int(size);
         struct Quad q = make_quad(eq_r, MOV, arg1, arg2);
-        append_quad(&bba->arr[bba->len - 1], q);
+        append_quad(&CURRENT_BB, q);
         return;
     }
     default:
@@ -367,7 +369,7 @@ void do_assignment_math(struct BasicBlockArr *bba, struct BinaryOp *bop,
             arg1.deref = 1;
         }
         struct Quad q = make_quad(arg1, op, arg2, arg1_val);
-        append_quad(&bba->arr[bba->len - 1], q);
+        append_quad(&CURRENT_BB, q);
         return;
     }
     is_val = parse_ast(bba, bop->right, NULL);
@@ -375,7 +377,7 @@ void do_assignment_math(struct BasicBlockArr *bba, struct BinaryOp *bop,
         get_loc_from_parse_ast(is_val, bop->right, bba, NULL);
 
     struct Quad q = make_quad(arg1_val, op, arg1_val, arg2);
-    append_quad(&bba->arr[bba->len - 1], q);
+    append_quad(&CURRENT_BB, q);
     return;
 }
 
@@ -390,7 +392,7 @@ void do_normal_math(struct BasicBlockArr *bba, struct BinaryOp *bop,
     int is_float = op_type == T_FLOAT || op_type == T_DOUBLE;
     enum Operation op = op_g + (is_float * 4);
     struct Quad q = make_quad(*eq_r, op, arg1, arg2);
-    append_quad(&bba->arr[bba->len - 1], q);
+    append_quad(&CURRENT_BB, q);
     return;
 }
 
@@ -421,7 +423,7 @@ enum Operation get_op_from_child(struct BasicBlockArr *bba, AstNode *child) {
     int is_val = parse_ast(bba, child, NULL);
     struct Quad last_q;
     struct Location arg1 = get_loc_from_parse_ast(is_val, child, bba, &last_q);
-    if (bba->arr[bba->len - 1].tail == NULL && bba->len > 1) {
+    if (CURRENT_BB.tail == NULL && bba->len > 1) {
         // if this is nested then grab the last thing
         last_q = bba->arr[bba->len - 2].tail->quad;
         if (!is_val) {
@@ -435,7 +437,7 @@ enum Operation get_op_from_child(struct BasicBlockArr *bba, AstNode *child) {
     struct Location cmp_val =
         make_Location_int(child->value_type->type != T_POINTER);
     struct Quad q = make_quad(make_Location_empty_reg(), CMP, arg1, cmp_val);
-    append_quad(&bba->arr[bba->len - 1], q);
+    append_quad(&CURRENT_BB, q);
     return CCEQ + (CMPLEN * (child->value_type->type == T_UNSIGNED));
 }
 
@@ -480,12 +482,12 @@ void parse_binary_op(struct BasicBlockArr *bba, struct BinaryOp *bop,
             struct Location arg2 = make_Location_int((i64)size);
             struct Location mul_result = make_Location_reg();
             struct Quad mul_q = make_quad(mul_result, MUL, arg1, arg2);
-            append_quad(&bba->arr[bba->len - 1], mul_q);
+            append_quad(&CURRENT_BB, mul_q);
             is_val = parse_ast(bba, ptr, NULL);
             arg1 = get_loc_from_parse_ast(is_val, ptr, bba, NULL);
             struct Quad q = make_quad(eq_r, ADD, arg1, mul_result);
 
-            append_quad(&bba->arr[bba->len - 1], q);
+            append_quad(&CURRENT_BB, q);
             return;
         }
         return do_normal_math(bba, bop, &eq_r, ADD);
@@ -515,12 +517,12 @@ void parse_binary_op(struct BasicBlockArr *bba, struct BinaryOp *bop,
             struct Location arg2 = make_Location_int((i64)size);
             struct Location mul_result = make_Location_reg();
             struct Quad mul_q = make_quad(mul_result, MUL, arg1, arg2);
-            append_quad(&bba->arr[bba->len - 1], mul_q);
+            append_quad(&CURRENT_BB, mul_q);
             is_val = parse_ast(bba, ptr, NULL);
             arg1 = get_loc_from_parse_ast(is_val, ptr, bba, NULL);
             struct Quad q = make_quad(eq_r, SUB, arg1, mul_result);
 
-            append_quad(&bba->arr[bba->len - 1], q);
+            append_quad(&CURRENT_BB, q);
             return;
         }
         // do normal math
@@ -581,7 +583,7 @@ void parse_binary_op(struct BasicBlockArr *bba, struct BinaryOp *bop,
             }
             struct Quad q =
                 make_quad(arg1, MOV, arg2, make_Location_empty_reg());
-            append_quad(&bba->arr[bba->len - 1], q);
+            append_quad(&CURRENT_BB, q);
             return;
         }
         is_val = parse_ast(bba, bop->right, &arg1);
@@ -589,7 +591,7 @@ void parse_binary_op(struct BasicBlockArr *bba, struct BinaryOp *bop,
             struct Location l =
                 get_loc_from_parse_ast(is_val, bop->right, bba, NULL);
             struct Quad q = make_quad(arg1, MOV, l, make_Location_empty_reg());
-            append_quad(&bba->arr[bba->len - 1], q);
+            append_quad(&CURRENT_BB, q);
             return;
         }
         return;
@@ -608,16 +610,16 @@ void parse_binary_op(struct BasicBlockArr *bba, struct BinaryOp *bop,
         struct Location s_addr = make_Location_reg();
         struct Quad lea_q =
             make_quad(s_addr, LEA, arg1, make_Location_empty_reg());
-        append_quad(&bba->arr[bba->len - 1], lea_q);
+        append_quad(&CURRENT_BB, lea_q);
         // ADD
         struct Location mem_addr = make_Location_reg();
         struct Quad add_q =
             make_quad(mem_addr, ADD, s_addr, make_Location_int(offset));
-        append_quad(&bba->arr[bba->len - 1], add_q);
+        append_quad(&CURRENT_BB, add_q);
         // LOAD
         struct Quad q =
             make_quad(eq_r, LOAD, mem_addr, make_Location_empty_reg());
-        append_quad(&bba->arr[bba->len - 1], q);
+        append_quad(&CURRENT_BB, q);
         return;
     }
     case INDSEL: {
@@ -630,11 +632,11 @@ void parse_binary_op(struct BasicBlockArr *bba, struct BinaryOp *bop,
         struct Location mem_addr = make_Location_reg();
         struct Quad add_q =
             make_quad(mem_addr, ADD, arg1, make_Location_int(offset));
-        append_quad(&bba->arr[bba->len - 1], add_q);
+        append_quad(&CURRENT_BB, add_q);
         // LOAD
         struct Quad q =
             make_quad(eq_r, LOAD, mem_addr, make_Location_empty_reg());
-        append_quad(&bba->arr[bba->len - 1], q);
+        append_quad(&CURRENT_BB, q);
         return;
     }
     // logical combo
@@ -647,26 +649,26 @@ void parse_binary_op(struct BasicBlockArr *bba, struct BinaryOp *bop,
         struct Quad q =
             make_quad(make_Location_empty_reg(), op, make_Location_BB(bba->len),
                       make_Location_empty_reg());
-        append_quad(&bba->arr[bba->len - 1], q);
+        append_quad(&CURRENT_BB, q);
         op = invert_cmp(get_op_from_child(bba, bop->right));
         if (op >= BRGEU) {
             op -= CMPLEN * 2;
         }
         q = make_quad(make_Location_empty_reg(), op, make_Location_BB(bba->len),
                       make_Location_empty_reg());
-        struct Quad *first_branch = append_quad(&bba->arr[bba->len - 1], q);
+        struct Quad *first_branch = append_quad(&CURRENT_BB, q);
         q = make_quad(eq_r, MOV, make_Location_int(1),
                       make_Location_empty_reg());
-        append_quad(&bba->arr[bba->len - 1], q);
+        append_quad(&CURRENT_BB, q);
         q = make_quad(make_Location_empty_reg(), op,
                       make_Location_BB(bba->len + 1),
                       make_Location_empty_reg());
-        struct Quad *second_branch = append_quad(&bba->arr[bba->len - 1], q);
+        struct Quad *second_branch = append_quad(&CURRENT_BB, q);
         append_basic_block(bba, make_bb(NULL));
         first_branch->arg1.bbn = bba->len - 1;
         q = make_quad(eq_r, MOV, make_Location_int(0),
                       make_Location_empty_reg());
-        append_quad(&bba->arr[bba->len - 1], q);
+        append_quad(&CURRENT_BB, q);
         append_basic_block(bba, make_bb(NULL));
         second_branch->arg1.bbn = bba->len - 1;
         return;
@@ -680,26 +682,26 @@ void parse_binary_op(struct BasicBlockArr *bba, struct BinaryOp *bop,
         struct Quad q =
             make_quad(make_Location_empty_reg(), op, make_Location_BB(bba->len),
                       make_Location_empty_reg());
-        append_quad(&bba->arr[bba->len - 1], q);
+        append_quad(&CURRENT_BB, q);
         op = get_op_from_child(bba, bop->right);
         if (op >= BRGEU) {
             op -= CMPLEN * 2;
         }
         q = make_quad(make_Location_empty_reg(), op, make_Location_BB(bba->len),
                       make_Location_empty_reg());
-        struct Quad *first_branch = append_quad(&bba->arr[bba->len - 1], q);
+        struct Quad *first_branch = append_quad(&CURRENT_BB, q);
         q = make_quad(eq_r, MOV, make_Location_int(0),
                       make_Location_empty_reg());
-        append_quad(&bba->arr[bba->len - 1], q);
+        append_quad(&CURRENT_BB, q);
         q = make_quad(make_Location_empty_reg(), op,
                       make_Location_BB(bba->len + 1),
                       make_Location_empty_reg());
-        struct Quad *second_branch = append_quad(&bba->arr[bba->len - 1], q);
+        struct Quad *second_branch = append_quad(&CURRENT_BB, q);
         append_basic_block(bba, make_bb(NULL));
         first_branch->arg1.bbn = bba->len - 1;
         q = make_quad(eq_r, MOV, make_Location_int(1),
                       make_Location_empty_reg());
-        append_quad(&bba->arr[bba->len - 1], q);
+        append_quad(&CURRENT_BB, q);
         append_basic_block(bba, make_bb(NULL));
         second_branch->arg1.bbn = bba->len - 1;
         return;
@@ -715,7 +717,7 @@ void parse_binary_op(struct BasicBlockArr *bba, struct BinaryOp *bop,
             get_loc_from_parse_ast(is_val, bop->right, bba, NULL);
         struct Quad cmp_q =
             make_quad(make_Location_empty_reg(), CMP, arg1, arg2);
-        append_quad(&bba->arr[bba->len - 1], cmp_q);
+        append_quad(&CURRENT_BB, cmp_q);
         enum Operation op;
         switch (bop->op) {
         case EQEQ:
@@ -745,7 +747,7 @@ void parse_binary_op(struct BasicBlockArr *bba, struct BinaryOp *bop,
             op += 6;
         struct Quad q = make_quad(eq_r, op, make_Location_empty_reg(),
                                   make_Location_empty_reg());
-        append_quad(&bba->arr[bba->len - 1], q);
+        append_quad(&CURRENT_BB, q);
         return;
     }
     }
@@ -761,7 +763,7 @@ void fall_through_if_statment(struct BasicBlockArr *bba,
     struct Quad q =
         make_quad(make_Location_empty_reg(), op, make_Location_BB(bba->len),
                   make_Location_empty_reg());
-    struct Quad *first_branch = append_quad(&bba->arr[bba->len - 1], q);
+    struct Quad *first_branch = append_quad(&CURRENT_BB, q);
     parse_ast(bba, if_s->statment, NULL);
     append_basic_block(bba, make_bb(NULL));
     first_branch->arg1.bbn = bba->len - 1;
@@ -775,7 +777,7 @@ void parse_while_statment(struct BasicBlockArr *bba,
         struct Quad q =
             make_quad(make_Location_empty_reg(), BR, make_Location_BB(bba->len),
                       make_Location_empty_reg());
-        branch_to_cmp_q = append_quad(&bba->arr[bba->len - 1], q);
+        branch_to_cmp_q = append_quad(&CURRENT_BB, q);
     }
     append_basic_block(bba, make_bb(NULL));
     size_t body_bbn = bba->len - 1;
@@ -791,11 +793,36 @@ void parse_while_statment(struct BasicBlockArr *bba,
     struct Quad branc_q =
         make_quad(make_Location_empty_reg(), op, make_Location_BB(body_bbn),
                   make_Location_empty_reg());
-    append_quad(&bba->arr[bba->len - 1], branc_q);
+    append_quad(&CURRENT_BB, branc_q);
     append_basic_block(bba, make_bb(NULL));
 }
 
-void parse_for_loop(struct BasicBlockArr *bba, struct ForStatment *for_s) {}
+void parse_for_loop(struct BasicBlockArr *bba, struct ForStatment *for_s) {
+    // do initalizer
+    parse_ast(bba, for_s->initalizer, NULL);
+    // do cmp
+    enum Operation op = invert_cmp(get_op_from_child(bba, for_s->cmp));
+    if (op >= BRGEU) {
+        op -= CMPLEN * 2;
+    }
+    // branch
+    struct Quad q =
+        make_quad(make_Location_empty_reg(), op, make_Location_BB(bba->len),
+                  make_Location_empty_reg());
+    struct Quad *branch_out_q = append_quad(&CURRENT_BB, q);
+    append_basic_block(bba, make_bb(NULL));
+    size_t body_bb = bba->len - 1;
+    parse_ast(bba, for_s->statment, NULL);
+    append_basic_block(bba, make_bb(NULL));
+    // size_t continue_point = bba->len - 1;
+    parse_ast(bba, for_s->incrementer, NULL);
+    parse_ast(bba, for_s->cmp, NULL);
+    q = make_quad(make_Location_empty_reg(), invert_cmp(op),
+                  make_Location_BB(body_bb), make_Location_empty_reg());
+    append_quad(&CURRENT_BB, q);
+    append_basic_block(bba, make_bb(NULL));
+    branch_out_q->arg1.bbn = bba->len - 1;
+}
 
 void parse_if_statment(struct BasicBlockArr *bba, struct IfStatment *if_s) {
     if (if_s->else_statment == NULL) {
@@ -808,11 +835,11 @@ void parse_if_statment(struct BasicBlockArr *bba, struct IfStatment *if_s) {
     struct Quad q =
         make_quad(make_Location_empty_reg(), op, make_Location_BB(bba->len),
                   make_Location_empty_reg());
-    struct Quad *branch_to_if = append_quad(&bba->arr[bba->len - 1], q);
+    struct Quad *branch_to_if = append_quad(&CURRENT_BB, q);
     parse_ast(bba, if_s->else_statment, NULL);
     q = make_quad(make_Location_empty_reg(), BR, make_Location_BB(bba->len),
                   make_Location_empty_reg());
-    struct Quad *branch_to_end = append_quad(&bba->arr[bba->len - 1], q);
+    struct Quad *branch_to_end = append_quad(&CURRENT_BB, q);
     append_basic_block(bba, make_bb(NULL));
     branch_to_if->arg1.bbn = bba->len - 1;
     parse_ast(bba, if_s->statment, NULL);

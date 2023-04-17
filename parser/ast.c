@@ -753,7 +753,7 @@ void print_AstNode(AstNode *head, unsigned int tab_count) {
         if (head->constant.type < 3) {
             printf("%lld", (long long)head->constant.val.u_int);
         } else if (head->constant.type < 6) {
-            printf("%lld", head->constant.val.u_int);
+            printf("%llu", head->constant.val.u_int);
         } else if (head->constant.type < 9) {
             printf("%Lg", head->constant.val.flt);
         } else {

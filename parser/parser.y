@@ -220,23 +220,21 @@ argument_expression_list: assignment_expression {
 // 6.5.3
 unary_expression: postfix_expression
                 | PLUSPLUS unary_expression {
-                    AstNode * node  = make_AstNode(ASTNODE_CONSTANT);
                     NVal n;
                     n.u_int = 1;
                     YYlvalNumLit nl;
                     nl.type = TINT;
                     nl.val = n;
-                    node->constant = nl;
+                    AstNode * node = make_ConstantType(nl);
                     $$ = make_binary_op(PLUSEQ, $2, node);
                 }
                 | MINUSMINUS unary_expression {
-                    AstNode * node  = make_AstNode(ASTNODE_CONSTANT);
                     NVal n;
                     n.u_int = 1;
                     YYlvalNumLit nl;
                     nl.type = TINT;
                     nl.val = n;
-                    node->constant = nl;
+                    AstNode * node = make_ConstantType(nl);
                     $$ = make_binary_op(MINUSEQ, $2, node);
                 }
                 | unary_operator cast_expression {
