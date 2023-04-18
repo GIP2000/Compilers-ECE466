@@ -13,32 +13,26 @@ struct JumpList {
 
 struct JumpList *push_jump_list(struct JumpList *head, struct Quad *quad) {
 
-    fprintf(stderr, "pushing to jump_list\n");
     struct JumpList *new_head =
         (struct JumpList *)malloc(sizeof(struct JumpList));
 
     new_head->next = head;
     new_head->q_to_update = quad;
-    fprintf(stderr, "push succesful to jump_list\n");
     return new_head;
 }
 
 void update_jump_list(struct JumpList *head, size_t bbn) {
     // this consumes the list
     // and frees the memory
-    fprintf(stderr, "starting update\n");
     struct JumpList *current;
     struct JumpList *prev;
     for (current = head, prev = NULL; current != NULL;
          prev = current, current = current->next) {
-        fprintf(stderr, "loop run\n");
-
         if (prev != NULL) {
             free(prev);
         }
         if (current->q_to_update == NULL)
             continue;
-        fprintf(stderr, "doing an UPDATE to a quad\n");
         current->q_to_update->arg1.bbn = bbn;
     }
 }
