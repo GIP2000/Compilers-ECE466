@@ -4,15 +4,53 @@
 #include "./quad.h"
 #include <stdio.h>
 
+#define CURRENT_BB bba->arr[bba->len - 1]
+
+struct JumpList {
+    struct Quad *q_to_update;
+    struct JumpList *next;
+};
+
+struct JumpList *push_jump_list(struct JumpList *head, struct Quad *quad) {
+
+    fprintf(stderr, "pushing to jump_list\n");
+    struct JumpList *new_head =
+        (struct JumpList *)malloc(sizeof(struct JumpList));
+
+    new_head->next = head;
+    new_head->q_to_update = quad;
+    fprintf(stderr, "push succesful to jump_list\n");
+    return new_head;
+}
+
+void update_jump_list(struct JumpList *head, size_t bbn) {
+    // this consumes the list
+    // and frees the memory
+    fprintf(stderr, "starting update\n");
+    struct JumpList *current;
+    struct JumpList *prev;
+    for (current = head, prev = NULL; current != NULL;
+         prev = current, current = current->next) {
+        fprintf(stderr, "loop run\n");
+
+        if (prev != NULL) {
+            free(prev);
+        }
+        if (current->q_to_update == NULL)
+            continue;
+        fprintf(stderr, "doing an UPDATE to a quad\n");
+        current->q_to_update->arg1.bbn = bbn;
+    }
+}
+
 extern SIZEOF_TABLE TYPE_SIZE_TABLE;
 const OpInverter INVERTER = {1, 0, 5, 3, 4, 2};
 extern VReg next_vreg;
-int parse_ast(struct BasicBlockArr *bba, AstNode *ast, struct Location *pass);
+int parse_ast(struct BasicBlockArr *bba, AstNode *ast, struct Location *pass,
+              struct JumpList **continue_list, struct JumpList **break_list);
 u64 size_of_abstract(struct Type *t);
 u64 get_struct_size(struct Type *t);
 u64 get_union_size(struct Type *t);
-
-#define CURRENT_BB bba->arr[bba->len - 1]
 
 u64 get_struct_or_union_size(struct Type *t) {
     if (t->extentions.st_un.is_cached)
@@ -117,7 +155,7 @@ struct BasicBlockArr build_bba_from_st(struct SymbolTable *st) {
         append_basic_block(&bba, make_bb(st->nodearr[i]));
         // TODO parse for all declarators
         parse_ast(&bba, st->nodearr[i]->val.type->extentions.func.statment,
-                  NULL);
+                  NULL, NULL, NULL);
     }
 
     return bba;
@@ -181,7 +219,8 @@ outside:
 }
 
 void parse_unary_op(struct BasicBlockArr *bba, struct UnaryOp *uop,
-                    struct Location *eq) {
+                    struct Location *eq, struct JumpList **continue_list,
+                    struct JumpList **break_list) {
 
     struct Location eq_r;
     if (eq == NULL) {
@@ -197,7 +236,8 @@ void parse_unary_op(struct BasicBlockArr *bba, struct UnaryOp *uop,
             fprintf(stderr, "Can't take the address of an rvalue\n");
             exit(3);
         }
-        int is_val = parse_ast(bba, uop->child, NULL);
+        int is_val =
+            parse_ast(bba, uop->child, NULL, continue_list, break_list);
         struct Location arg1 =
             get_loc_from_parse_ast(is_val, uop->child, bba, NULL);
         struct Quad q = make_quad(eq_r, LEA, arg1, arg2);
@@ -208,7 +248,8 @@ void parse_unary_op(struct BasicBlockArr *bba, struct UnaryOp *uop,
         if (uop->child->value_type->type != T_POINTER) {
             fprintf(stderr, "Can't Deref a non pointer type");
         }
-        int is_val = parse_ast(bba, uop->child, NULL);
+        int is_val =
+            parse_ast(bba, uop->child, NULL, continue_list, break_list);
         struct Location arg1 =
             get_loc_from_parse_ast(is_val, uop->child, bba, NULL);
         struct Quad q = make_quad(eq_r, LOAD, arg1, arg2);
@@ -227,7 +268,8 @@ void parse_unary_op(struct BasicBlockArr *bba, struct UnaryOp *uop,
         } else {
             op = MUL;
         }
-        int is_val = parse_ast(bba, uop->child, NULL);
+        int is_val =
+            parse_ast(bba, uop->child, NULL, continue_list, break_list);
         struct Location arg1 =
             get_loc_from_parse_ast(is_val, uop->child, bba, NULL);
         struct Quad q = make_quad(eq_r, op, arg1, arg2);
@@ -235,7 +277,8 @@ void parse_unary_op(struct BasicBlockArr *bba, struct UnaryOp *uop,
         return;
     }
     case '~': {
-        int is_val = parse_ast(bba, uop->child, NULL);
+        int is_val =
+            parse_ast(bba, uop->child, NULL, continue_list, break_list);
         struct Location arg1 =
             get_loc_from_parse_ast(is_val, uop->child, bba, NULL);
         struct Quad q = make_quad(eq_r, BINOT, arg1, arg2);
@@ -243,7 +286,8 @@ void parse_unary_op(struct BasicBlockArr *bba, struct UnaryOp *uop,
         return;
     }
     case '!': {
-        int is_val = parse_ast(bba, uop->child, NULL);
+        int is_val =
+            parse_ast(bba, uop->child, NULL, continue_list, break_list);
         struct Location arg1 =
             get_loc_from_parse_ast(is_val, uop->child, bba, NULL);
         struct Quad q = make_quad(eq_r, LOGNOT, arg1, arg2);
@@ -263,7 +307,8 @@ void parse_unary_op(struct BasicBlockArr *bba, struct UnaryOp *uop,
             fprintf(stderr, "Invalid ++ expression\n");
             exit(3);
         }
-        int is_val = parse_ast(bba, uop->child, NULL);
+        int is_val =
+            parse_ast(bba, uop->child, NULL, continue_list, break_list);
 
         // this isn't efficent since im doing some moving around
         // but lets pretend im going to have an optimizer that
@@ -305,7 +350,8 @@ void parse_unary_op(struct BasicBlockArr *bba, struct UnaryOp *uop,
             fprintf(stderr, "Invalid ++ expression\n");
             exit(3);
         }
-        int is_val = parse_ast(bba, uop->child, NULL);
+        int is_val =
+            parse_ast(bba, uop->child, NULL, continue_list, break_list);
 
         // this isn't efficent since im doing some moving around
         // but lets pretend im going to have an optimizer that
@@ -350,8 +396,9 @@ void parse_unary_op(struct BasicBlockArr *bba, struct UnaryOp *uop,
 }
 
 void do_assignment_math(struct BasicBlockArr *bba, struct BinaryOp *bop,
-                        enum Operation op_g) {
-    int is_val = parse_ast(bba, bop->left, NULL);
+                        enum Operation op_g, struct JumpList **continue_list,
+                        struct JumpList **break_list) {
+    int is_val = parse_ast(bba, bop->left, NULL, continue_list, break_list);
     struct Quad last_quad;
     struct Location arg1_val =
         get_loc_from_parse_ast(is_val, bop->left, bba, &last_quad);
@@ -360,7 +407,8 @@ void do_assignment_math(struct BasicBlockArr *bba, struct BinaryOp *bop,
         op_g + (op_type->type == T_FLOAT || op_type->type == T_DOUBLE) * 4;
 
     if (bop->left->type != ASTNODE_IDENT) {
-        int is_val_2 = parse_ast(bba, bop->right, NULL);
+        int is_val_2 =
+            parse_ast(bba, bop->right, NULL, continue_list, break_list);
         struct Location arg2 =
             get_loc_from_parse_ast(is_val_2, bop->right, bba, NULL);
         struct Location arg1 = arg1_val;
@@ -372,7 +420,7 @@ void do_assignment_math(struct BasicBlockArr *bba, struct BinaryOp *bop,
         append_quad(&CURRENT_BB, q);
         return;
     }
-    is_val = parse_ast(bba, bop->right, NULL);
+    is_val = parse_ast(bba, bop->right, NULL, continue_list, break_list);
     struct Location arg2 =
         get_loc_from_parse_ast(is_val, bop->right, bba, NULL);
 
@@ -382,10 +430,12 @@ void do_assignment_math(struct BasicBlockArr *bba, struct BinaryOp *bop,
 }
 
 void do_normal_math(struct BasicBlockArr *bba, struct BinaryOp *bop,
-                    struct Location *eq_r, enum Operation op_g) {
-    int is_val = parse_ast(bba, bop->left, NULL);
+                    struct Location *eq_r, enum Operation op_g,
+                    struct JumpList **continue_list,
+                    struct JumpList **break_list) {
+    int is_val = parse_ast(bba, bop->left, NULL, continue_list, break_list);
     struct Location arg1 = get_loc_from_parse_ast(is_val, bop->left, bba, NULL);
-    is_val = parse_ast(bba, bop->right, NULL);
+    is_val = parse_ast(bba, bop->right, NULL, continue_list, break_list);
     struct Location arg2 =
         get_loc_from_parse_ast(is_val, bop->right, bba, NULL);
     enum Types op_type = get_last_from_next(bop->right->value_type)->type;
@@ -419,8 +469,10 @@ enum Operation invert_cmp(enum Operation op) {
     return INVERTER[op - start] + start;
 }
 
-enum Operation get_op_from_child(struct BasicBlockArr *bba, AstNode *child) {
-    int is_val = parse_ast(bba, child, NULL);
+enum Operation get_op_from_child(struct BasicBlockArr *bba, AstNode *child,
+                                 struct JumpList **continue_list,
+                                 struct JumpList **break_list) {
+    int is_val = parse_ast(bba, child, NULL, continue_list, break_list);
     struct Quad last_q;
     struct Location arg1 = get_loc_from_parse_ast(is_val, child, bba, &last_q);
     if (CURRENT_BB.tail == NULL && bba->len > 1) {
@@ -442,7 +494,8 @@ enum Operation get_op_from_child(struct BasicBlockArr *bba, AstNode *child) {
 }
 
 void parse_binary_op(struct BasicBlockArr *bba, struct BinaryOp *bop,
-                     struct Location *eq) {
+                     struct Location *eq, struct JumpList **continue_list,
+                     struct JumpList **break_list) {
     struct Location eq_r;
     if (eq == NULL) {
         eq_r = make_Location_reg();
@@ -476,21 +529,22 @@ void parse_binary_op(struct BasicBlockArr *bba, struct BinaryOp *bop,
             u64 size =
                 size_of_abstract(ptr->value_type->extentions.next_type.next);
             // mul size by integer
-            int is_val = parse_ast(bba, integer, NULL);
+            int is_val =
+                parse_ast(bba, integer, NULL, continue_list, break_list);
             struct Location arg1 =
                 get_loc_from_parse_ast(is_val, integer, bba, NULL);
             struct Location arg2 = make_Location_int((i64)size);
             struct Location mul_result = make_Location_reg();
             struct Quad mul_q = make_quad(mul_result, MUL, arg1, arg2);
             append_quad(&CURRENT_BB, mul_q);
-            is_val = parse_ast(bba, ptr, NULL);
+            is_val = parse_ast(bba, ptr, NULL, continue_list, break_list);
             arg1 = get_loc_from_parse_ast(is_val, ptr, bba, NULL);
             struct Quad q = make_quad(eq_r, ADD, arg1, mul_result);
 
             append_quad(&CURRENT_BB, q);
             return;
         }
-        return do_normal_math(bba, bop, &eq_r, ADD);
+        return do_normal_math(bba, bop, &eq_r, ADD, continue_list, break_list);
     }
     case '-': {
         if (bop->left->value_type->type == T_POINTER ^
@@ -511,14 +565,15 @@ void parse_binary_op(struct BasicBlockArr *bba, struct BinaryOp *bop,
             u64 size =
                 size_of_abstract(ptr->value_type->extentions.next_type.next);
             // mul size by integer
-            int is_val = parse_ast(bba, integer, NULL);
+            int is_val =
+                parse_ast(bba, integer, NULL, continue_list, break_list);
             struct Location arg1 =
                 get_loc_from_parse_ast(is_val, integer, bba, NULL);
             struct Location arg2 = make_Location_int((i64)size);
             struct Location mul_result = make_Location_reg();
             struct Quad mul_q = make_quad(mul_result, MUL, arg1, arg2);
             append_quad(&CURRENT_BB, mul_q);
-            is_val = parse_ast(bba, ptr, NULL);
+            is_val = parse_ast(bba, ptr, NULL, continue_list, break_list);
             arg1 = get_loc_from_parse_ast(is_val, ptr, bba, NULL);
             struct Quad q = make_quad(eq_r, SUB, arg1, mul_result);
 
@@ -526,55 +581,60 @@ void parse_binary_op(struct BasicBlockArr *bba, struct BinaryOp *bop,
             return;
         }
         // do normal math
-        return do_normal_math(bba, bop, &eq_r, SUB);
+        return do_normal_math(bba, bop, &eq_r, SUB, continue_list, break_list);
     }
     case '*':
-        return do_normal_math(bba, bop, &eq_r, MUL);
+        return do_normal_math(bba, bop, &eq_r, MUL, continue_list, break_list);
     case '/':
-        return do_normal_math(bba, bop, &eq_r, DIV);
+        return do_normal_math(bba, bop, &eq_r, DIV, continue_list, break_list);
     case '%':
-        return do_normal_math(bba, bop, &eq_r, MOD);
+        return do_normal_math(bba, bop, &eq_r, MOD, continue_list, break_list);
     case '&':
-        return do_normal_math(bba, bop, &eq_r, BIAND);
+        return do_normal_math(bba, bop, &eq_r, BIAND, continue_list,
+                              break_list);
     case '|':
-        return do_normal_math(bba, bop, &eq_r, BIOR);
+        return do_normal_math(bba, bop, &eq_r, BIOR, continue_list, break_list);
     case '^':
-        return do_normal_math(bba, bop, &eq_r, BIXOR);
+        return do_normal_math(bba, bop, &eq_r, BIXOR, continue_list,
+                              break_list);
     case SHL:
-        return do_normal_math(bba, bop, &eq_r, BISHL);
+        return do_normal_math(bba, bop, &eq_r, BISHL, continue_list,
+                              break_list);
     case SHR:
-        return do_normal_math(bba, bop, &eq_r, BISHR);
+        return do_normal_math(bba, bop, &eq_r, BISHR, continue_list,
+                              break_list);
     case PLUSEQ:
-        return do_assignment_math(bba, bop, ADD);
+        return do_assignment_math(bba, bop, ADD, continue_list, break_list);
     case MINUSEQ:
-        return do_assignment_math(bba, bop, SUB);
+        return do_assignment_math(bba, bop, SUB, continue_list, break_list);
     case TIMESEQ:
-        return do_assignment_math(bba, bop, MUL);
+        return do_assignment_math(bba, bop, MUL, continue_list, break_list);
     case DIVEQ:
-        return do_assignment_math(bba, bop, DIV);
+        return do_assignment_math(bba, bop, DIV, continue_list, break_list);
     case MODEQ:
-        return do_assignment_math(bba, bop, MOD);
+        return do_assignment_math(bba, bop, MOD, continue_list, break_list);
     case SHLEQ:
-        return do_assignment_math(bba, bop, BISHL);
+        return do_assignment_math(bba, bop, BISHL, continue_list, break_list);
     case SHREQ:
-        return do_assignment_math(bba, bop, BISHR);
+        return do_assignment_math(bba, bop, BISHR, continue_list, break_list);
     case ANDEQ:
-        return do_assignment_math(bba, bop, BIAND);
+        return do_assignment_math(bba, bop, BIAND, continue_list, break_list);
     case XOREQ:
-        return do_assignment_math(bba, bop, BIXOR);
+        return do_assignment_math(bba, bop, BIXOR, continue_list, break_list);
     case OREQ:
-        return do_assignment_math(bba, bop, BIOR);
+        return do_assignment_math(bba, bop, BIOR, continue_list, break_list);
     case '=': {
         if (!is_lvalue(bop->left)) {
             fprintf(stderr, "Can't assign to an rvalue\n");
             exit(3);
         }
-        int is_val = parse_ast(bba, bop->left, NULL);
+        int is_val = parse_ast(bba, bop->left, NULL, continue_list, break_list);
         struct Quad last_quad;
         struct Location arg1 =
             get_loc_from_parse_ast(is_val, bop->left, bba, &last_quad);
         if (bop->left->type != ASTNODE_IDENT) {
-            int is_val_2 = parse_ast(bba, bop->right, NULL);
+            int is_val_2 =
+                parse_ast(bba, bop->right, NULL, continue_list, break_list);
             struct Location arg2 =
                 get_loc_from_parse_ast(is_val_2, bop->right, bba, NULL);
             if (!is_val) {
@@ -586,7 +646,7 @@ void parse_binary_op(struct BasicBlockArr *bba, struct BinaryOp *bop,
             append_quad(&CURRENT_BB, q);
             return;
         }
-        is_val = parse_ast(bba, bop->right, &arg1);
+        is_val = parse_ast(bba, bop->right, &arg1, continue_list, break_list);
         if (is_val) {
             struct Location l =
                 get_loc_from_parse_ast(is_val, bop->right, bba, NULL);
@@ -603,7 +663,7 @@ void parse_binary_op(struct BasicBlockArr *bba, struct BinaryOp *bop,
         print_type(bop->left->value_type);
         printf("<- struct type\n");
         u64 offset = bop->right->ident->offset;
-        int is_val = parse_ast(bba, bop->left, NULL);
+        int is_val = parse_ast(bba, bop->left, NULL, continue_list, break_list);
         struct Location arg1 =
             get_loc_from_parse_ast(is_val, bop->left, bba, NULL);
         // LEA
@@ -626,7 +686,7 @@ void parse_binary_op(struct BasicBlockArr *bba, struct BinaryOp *bop,
         size_of_abstract(bop->left->value_type->extentions.next_type.next);
         u64 offset = bop->right->ident->offset;
         // ADD
-        int is_val = parse_ast(bba, bop->left, NULL);
+        int is_val = parse_ast(bba, bop->left, NULL, continue_list, break_list);
         struct Location arg1 =
             get_loc_from_parse_ast(is_val, bop->left, bba, NULL);
         struct Location mem_addr = make_Location_reg();
@@ -641,7 +701,8 @@ void parse_binary_op(struct BasicBlockArr *bba, struct BinaryOp *bop,
     }
     // logical combo
     case LOGAND: {
-        enum Operation op = invert_cmp(get_op_from_child(bba, bop->left));
+        enum Operation op = invert_cmp(
+            get_op_from_child(bba, bop->left, continue_list, break_list));
         if (op >= BRGEU) {
             op -= CMPLEN * 2;
         }
@@ -650,7 +711,8 @@ void parse_binary_op(struct BasicBlockArr *bba, struct BinaryOp *bop,
             make_quad(make_Location_empty_reg(), op, make_Location_BB(bba->len),
                       make_Location_empty_reg());
         append_quad(&CURRENT_BB, q);
-        op = invert_cmp(get_op_from_child(bba, bop->right));
+        op = invert_cmp(
+            get_op_from_child(bba, bop->right, continue_list, break_list));
         if (op >= BRGEU) {
             op -= CMPLEN * 2;
         }
@@ -674,7 +736,8 @@ void parse_binary_op(struct BasicBlockArr *bba, struct BinaryOp *bop,
         return;
     }
     case LOGOR: {
-        enum Operation op = get_op_from_child(bba, bop->left);
+        enum Operation op =
+            get_op_from_child(bba, bop->left, continue_list, break_list);
         if (op >= BRGEU) {
             op -= CMPLEN * 2;
         }
@@ -683,7 +746,7 @@ void parse_binary_op(struct BasicBlockArr *bba, struct BinaryOp *bop,
             make_quad(make_Location_empty_reg(), op, make_Location_BB(bba->len),
                       make_Location_empty_reg());
         append_quad(&CURRENT_BB, q);
-        op = get_op_from_child(bba, bop->right);
+        op = get_op_from_child(bba, bop->right, continue_list, break_list);
         if (op >= BRGEU) {
             op -= CMPLEN * 2;
         }
@@ -709,10 +772,10 @@ void parse_binary_op(struct BasicBlockArr *bba, struct BinaryOp *bop,
     default: {
         // all the comparisons
         // do the cmp
-        int is_val = parse_ast(bba, bop->left, NULL);
+        int is_val = parse_ast(bba, bop->left, NULL, continue_list, break_list);
         struct Location arg1 =
             get_loc_from_parse_ast(is_val, bop->left, bba, NULL);
-        is_val = parse_ast(bba, bop->left, NULL);
+        is_val = parse_ast(bba, bop->right, NULL, continue_list, break_list);
         struct Location arg2 =
             get_loc_from_parse_ast(is_val, bop->right, bba, NULL);
         struct Quad cmp_q =
@@ -754,9 +817,12 @@ void parse_binary_op(struct BasicBlockArr *bba, struct BinaryOp *bop,
 }
 
 void fall_through_if_statment(struct BasicBlockArr *bba,
-                              struct IfStatment *if_s) {
+                              struct IfStatment *if_s,
+                              struct JumpList **continue_list,
+                              struct JumpList **break_list) {
 
-    enum Operation op = invert_cmp(get_op_from_child(bba, if_s->cmp));
+    enum Operation op = invert_cmp(
+        get_op_from_child(bba, if_s->cmp, continue_list, break_list));
     if (op >= BRGEU) {
         op -= CMPLEN * 2;
     }
@@ -764,13 +830,15 @@ void fall_through_if_statment(struct BasicBlockArr *bba,
         make_quad(make_Location_empty_reg(), op, make_Location_BB(bba->len),
                   make_Location_empty_reg());
     struct Quad *first_branch = append_quad(&CURRENT_BB, q);
-    parse_ast(bba, if_s->statment, NULL);
+    parse_ast(bba, if_s->statment, NULL, continue_list, break_list);
     append_basic_block(bba, make_bb(NULL));
     first_branch->arg1.bbn = bba->len - 1;
 }
 
 void parse_while_statment(struct BasicBlockArr *bba,
-                          struct WhileStatment *while_s) {
+                          struct WhileStatment *while_s,
+                          struct JumpList **old_continue_list,
+                          struct JumpList **old_break_list) {
     struct Quad *branch_to_cmp_q = NULL;
     if (!while_s->is_do) {
         // if it isn't a do add a branch to the cmp
@@ -781,12 +849,20 @@ void parse_while_statment(struct BasicBlockArr *bba,
     }
     append_basic_block(bba, make_bb(NULL));
     size_t body_bbn = bba->len - 1;
-    parse_ast(bba, while_s->statment, NULL);
+
+    struct JumpList *continue_list = push_jump_list(NULL, NULL);
+    struct JumpList *break_list = push_jump_list(NULL, NULL);
+
+    parse_ast(bba, while_s->statment, NULL, &continue_list, &break_list);
+    fprintf(stderr, "succesfully parsed statment ast\n");
     append_basic_block(bba, make_bb(NULL));
+    size_t continue_point = bba->len - 1;
+    update_jump_list(continue_list, continue_point);
     if (branch_to_cmp_q != NULL) {
         branch_to_cmp_q->arg1.bbn = bba->len - 1;
     }
-    enum Operation op = get_op_from_child(bba, while_s->cmp);
+    enum Operation op =
+        get_op_from_child(bba, while_s->cmp, old_continue_list, old_break_list);
     if (op >= BRGEU) {
         op -= CMPLEN * 2;
     }
@@ -795,13 +871,20 @@ void parse_while_statment(struct BasicBlockArr *bba,
                   make_Location_empty_reg());
     append_quad(&CURRENT_BB, branc_q);
     append_basic_block(bba, make_bb(NULL));
+
+    size_t break_point = bba->len - 1;
+    fprintf(stderr, "break point %zu\n", break_point);
+    update_jump_list(break_list, break_point);
 }
 
-void parse_for_loop(struct BasicBlockArr *bba, struct ForStatment *for_s) {
+void parse_for_loop(struct BasicBlockArr *bba, struct ForStatment *for_s,
+                    struct JumpList **old_continue_list,
+                    struct JumpList **old_break_list) {
     // do initalizer
-    parse_ast(bba, for_s->initalizer, NULL);
+    parse_ast(bba, for_s->initalizer, NULL, old_continue_list, old_break_list);
     // do cmp
-    enum Operation op = invert_cmp(get_op_from_child(bba, for_s->cmp));
+    enum Operation op = invert_cmp(
+        get_op_from_child(bba, for_s->cmp, old_continue_list, old_break_list));
     if (op >= BRGEU) {
         op -= CMPLEN * 2;
     }
@@ -812,23 +895,31 @@ void parse_for_loop(struct BasicBlockArr *bba, struct ForStatment *for_s) {
     struct Quad *branch_out_q = append_quad(&CURRENT_BB, q);
     append_basic_block(bba, make_bb(NULL));
     size_t body_bb = bba->len - 1;
-    parse_ast(bba, for_s->statment, NULL);
+    struct JumpList *continue_list = push_jump_list(NULL, NULL);
+    struct JumpList *break_list = push_jump_list(NULL, NULL);
+    parse_ast(bba, for_s->statment, NULL, &continue_list, &break_list);
     append_basic_block(bba, make_bb(NULL));
-    // size_t continue_point = bba->len - 1;
-    parse_ast(bba, for_s->incrementer, NULL);
-    parse_ast(bba, for_s->cmp, NULL);
+    size_t continue_point = bba->len - 1;
+    update_jump_list(continue_list, continue_point);
+    parse_ast(bba, for_s->incrementer, NULL, old_continue_list, old_break_list);
+    parse_ast(bba, for_s->cmp, NULL, old_continue_list, old_break_list);
     q = make_quad(make_Location_empty_reg(), invert_cmp(op),
                   make_Location_BB(body_bb), make_Location_empty_reg());
     append_quad(&CURRENT_BB, q);
     append_basic_block(bba, make_bb(NULL));
-    branch_out_q->arg1.bbn = bba->len - 1;
+    size_t break_point = bba->len - 1;
+    branch_out_q->arg1.bbn = break_point;
+    update_jump_list(break_list, break_point);
 }
 
-void parse_if_statment(struct BasicBlockArr *bba, struct IfStatment *if_s) {
+void parse_if_statment(struct BasicBlockArr *bba, struct IfStatment *if_s,
+                       struct JumpList **continue_list,
+                       struct JumpList **break_list) {
     if (if_s->else_statment == NULL) {
-        return fall_through_if_statment(bba, if_s);
+        return fall_through_if_statment(bba, if_s, continue_list, break_list);
     }
-    enum Operation op = get_op_from_child(bba, if_s->cmp);
+    enum Operation op =
+        get_op_from_child(bba, if_s->cmp, continue_list, break_list);
     if (op >= BRGEU) {
         op -= CMPLEN * 2;
     }
@@ -836,18 +927,19 @@ void parse_if_statment(struct BasicBlockArr *bba, struct IfStatment *if_s) {
         make_quad(make_Location_empty_reg(), op, make_Location_BB(bba->len),
                   make_Location_empty_reg());
     struct Quad *branch_to_if = append_quad(&CURRENT_BB, q);
-    parse_ast(bba, if_s->else_statment, NULL);
+    parse_ast(bba, if_s->else_statment, NULL, continue_list, break_list);
     q = make_quad(make_Location_empty_reg(), BR, make_Location_BB(bba->len),
                   make_Location_empty_reg());
     struct Quad *branch_to_end = append_quad(&CURRENT_BB, q);
     append_basic_block(bba, make_bb(NULL));
     branch_to_if->arg1.bbn = bba->len - 1;
-    parse_ast(bba, if_s->statment, NULL);
+    parse_ast(bba, if_s->statment, NULL, continue_list, break_list);
     append_basic_block(bba, make_bb(NULL));
     branch_to_end->arg1.bbn = bba->len - 1;
 }
 
-int parse_ast(struct BasicBlockArr *bba, AstNode *ast, struct Location *eq) {
+int parse_ast(struct BasicBlockArr *bba, AstNode *ast, struct Location *eq,
+              struct JumpList **continue_list, struct JumpList **break_list) {
     switch (ast->type) {
     case ASTNODE_CONSTANT:
         return 1;
@@ -856,10 +948,10 @@ int parse_ast(struct BasicBlockArr *bba, AstNode *ast, struct Location *eq) {
     case ASTNODE_IDENT:
         return 1;
     case ASTNODE_UNARYOP:
-        parse_unary_op(bba, &ast->unary_op, eq);
+        parse_unary_op(bba, &ast->unary_op, eq, continue_list, break_list);
         break;
     case ASTNODE_BINARYOP:
-        parse_binary_op(bba, &ast->binary_op, eq);
+        parse_binary_op(bba, &ast->binary_op, eq, continue_list, break_list);
         break;
     case ASTNODE_TERNAYROP:
         break;
@@ -871,7 +963,7 @@ int parse_ast(struct BasicBlockArr *bba, AstNode *ast, struct Location *eq) {
             if (stln->node == NULL) {
                 continue;
             }
-            parse_ast(bba, stln->node, eq);
+            parse_ast(bba, stln->node, eq, continue_list, break_list);
         }
         break;
     }
@@ -880,35 +972,53 @@ int parse_ast(struct BasicBlockArr *bba, AstNode *ast, struct Location *eq) {
         // I need to declare all locals at the beg of a fucntion
         break;
     case ASTNODE_IF_STATMENT:
-        parse_if_statment(bba, &ast->if_statment);
+        parse_if_statment(bba, &ast->if_statment, continue_list, break_list);
         break;
     case ASTNODE_FOR_STATMENT:
-        parse_for_loop(bba, &ast->for_statment);
+        parse_for_loop(bba, &ast->for_statment, continue_list, break_list);
         break;
     case ASTNODE_WHILE_STATMENT:
-        parse_while_statment(bba, &ast->while_statment);
+        parse_while_statment(bba, &ast->while_statment, continue_list,
+                             break_list);
         break;
     case ASTNODE_GOTO_STATMENT:
-        break;
+        fprintf(stderr, "UNIMPLEMENTED\n");
+        exit(3);
     case ASTNODE_CONTINUE_STATMENT:
+        *continue_list =
+            push_jump_list(*continue_list,
+                           append_quad(&bba->arr[bba->len - 1],
+                                       make_quad(make_Location_empty_reg(), BR,
+                                                 make_Location_BB(bba->len - 1),
+                                                 make_Location_empty_reg())));
         break;
     case ASTNODE_BREAK_STATMENT:
+        *break_list = push_jump_list(
+            *break_list, append_quad(&bba->arr[bba->len - 1],
+                                     make_quad(make_Location_empty_reg(), BR,
+                                               make_Location_BB(bba->len - 1),
+                                               make_Location_empty_reg())));
         break;
     case ASTNODE_RETURN_STATMENT:
         break;
     case ASTNODE_LABEL_STATMENT:
-        break;
+        fprintf(stderr, "UNIMPLEMENTED\n");
+        exit(3);
     case ASTNODE_SWITCH_STATMENT:
-        break;
+        fprintf(stderr, "UNIMPLEMENTED\n");
+        exit(3);
     case ASTNODE_CASE_STATMENT:
-        break;
+        fprintf(stderr, "UNIMPLEMENTED\n");
+        exit(3);
     case ASTNODE_DEFAULT_STATMENT:
-        break;
+        fprintf(stderr, "UNIMPLEMENTED\n");
+        exit(3);
     case ASTNODE_CAST:
         // should only have to do something
         // if I am going from floating point to integer
         // otherwise noop
-        return parse_ast(bba, ast->cast_statment.val, eq);
+        return parse_ast(bba, ast->cast_statment.val, eq, continue_list,
+                         break_list);
     }
     return 0;
 }
