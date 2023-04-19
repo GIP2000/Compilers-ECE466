@@ -276,12 +276,15 @@ AstNode *make_binary_op(int op, AstNode *left, AstNode *right) {
 
     // math binary ops
     if (op == '+' || op == '-' || op == '*' || op == '/' || op == PLUSEQ ||
-        op == MINUSEQ || op == TIMESEQ || op == DIVEQ) {
+        op == MINUSEQ || op == TIMESEQ || op == DIVEQ || op == EQEQ ||
+        op == NOTEQ || op == '<' || op == LTEQ || op == '>' || op == GTEQ) {
         int left_cast;
         int right_cast;
         if ((ast->value_type = arithmatic_res_type(
                  left->value_type, right->value_type,
-                 op == '+' || op == '-' || op == PLUSEQ || op == MINUSEQ,
+                 op == '+' || op == '-' || op == PLUSEQ || op == MINUSEQ ||
+                     op == EQEQ || op == NOTEQ || op == '<' || op == LTEQ ||
+                     op == '>' || op == GTEQ,
                  &left_cast, &right_cast)) == NULL) {
             yyerror("Invalid arugment for math expression");
             exit(2);
@@ -299,8 +302,7 @@ AstNode *make_binary_op(int op, AstNode *left, AstNode *right) {
         return ast;
     }
     // Integer only
-    if (op == '%' || op == EQEQ || op == NOTEQ || op == '<' || op == LTEQ ||
-        op == '>' || op == GTEQ || op == LOGAND || op == LOGOR || op == MODEQ ||
+    if (op == '%' || op == LOGAND || op == LOGOR || op == MODEQ ||
         op == SHLEQ || op == SHREQ || op == ANDEQ || op == XOREQ ||
         op == OREQ || op == '&' || op == '|' || op == '^' || op == SHL ||
         op == SHR) {
@@ -485,6 +487,10 @@ AstNode *make_ternary_op(AstNode *cond, AstNode *truthy, AstNode *falsey) {
 }
 
 AstNode *make_func_call(AstNode *name, struct AstNodeListNode *arguments) {
+    if (name->value_type->type != T_FUNC) {
+        yyerror("value is not callbable");
+        exit(2);
+    }
     AstNode *ast = make_AstNode(ASTNODE_FUNCCALL);
     ast->func_call.name = name;
     if (arguments == NULL) {
@@ -503,7 +509,7 @@ AstNode *make_func_call(AstNode *name, struct AstNodeListNode *arguments) {
     ast->func_call.arguments = *prev;
     free(prev);
 
-    // TODO fix this to have a value_type
+    ast->value_type = name->value_type->extentions.func.ret;
     ast->func_call.argument_count = i;
 
     return ast;

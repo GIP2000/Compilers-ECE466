@@ -533,6 +533,13 @@ void parse_binary_op(struct BasicBlockArr *bba, struct BinaryOp *bop,
             append_quad(&CURRENT_BB, mul_q);
             is_val = parse_ast(bba, ptr, NULL, continue_list, break_list);
             arg1 = get_loc_from_parse_ast(is_val, ptr, bba, NULL);
+            // if arg1 is a variable and that variable is an array LEA
+            if (arg1.loc_type == VAR && arg1.var->val.type->type == T_ARR) {
+                struct Location res = make_Location_reg();
+                append_quad(&CURRENT_BB, make_quad(res, LEA, arg1,
+                                                   make_Location_empty_reg()));
+                arg1 = res;
+            }
             struct Quad q = make_quad(eq_r, ADD, arg1, mul_result);
 
             append_quad(&CURRENT_BB, q);
@@ -569,6 +576,13 @@ void parse_binary_op(struct BasicBlockArr *bba, struct BinaryOp *bop,
             append_quad(&CURRENT_BB, mul_q);
             is_val = parse_ast(bba, ptr, NULL, continue_list, break_list);
             arg1 = get_loc_from_parse_ast(is_val, ptr, bba, NULL);
+
+            if (arg1.loc_type == VAR && arg1.var->val.type->type == T_ARR) {
+                struct Location res = make_Location_reg();
+                append_quad(&CURRENT_BB, make_quad(res, LEA, arg1,
+                                                   make_Location_empty_reg()));
+                arg1 = res;
+            }
             struct Quad q = make_quad(eq_r, SUB, arg1, mul_result);
 
             append_quad(&CURRENT_BB, q);
@@ -960,6 +974,15 @@ void parse_function_call(struct BasicBlockArr *bba, struct FuncCall *func_call,
                           make_Location_empty_reg()));
 }
 
+void parse_return_statment(struct BasicBlockArr *bba, AstNode *return_statment,
+                           struct Location *eq, struct JumpList **continue_list,
+                           struct JumpList **break_list) {
+    int is_val = parse_ast(bba, return_statment, eq, continue_list, break_list);
+    struct Location ret_val =
+        get_loc_from_parse_ast(is_val, return_statment, bba, NULL);
+    append_quad(&CURRENT_BB, make_quad(make_Location_empty_reg(), RET, ret_val,
+                                       make_Location_empty_reg()));
+}
 int parse_ast(struct BasicBlockArr *bba, AstNode *ast, struct Location *eq,
               struct JumpList **continue_list, struct JumpList **break_list) {
     switch (ast->type) {
@@ -1023,6 +1046,8 @@ int parse_ast(struct BasicBlockArr *bba, AstNode *ast, struct Location *eq,
                                                make_Location_empty_reg())));
         break;
     case ASTNODE_RETURN_STATMENT:
+        parse_return_statment(bba, ast->return_statment, eq, continue_list,
+                              break_list);
         break;
     case ASTNODE_LABEL_STATMENT:
         fprintf(stderr, "UNIMPLEMENTED\n");

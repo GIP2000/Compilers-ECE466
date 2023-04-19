@@ -378,9 +378,7 @@ conditional_expression: logical_or_expression
 // 6.5.16
 assignment_expression: conditional_expression
                      | unary_expression assignment_operator assignment_expression {
-                        fprintf(stderr, "I get here\n");
                         $$ = make_binary_op($2, $1, $3);
-                        fprintf(stderr, "I get here 2\n");
                      }
                      ;
 assignment_operator: '=' {$$ = '=';}
@@ -1126,7 +1124,17 @@ external_declaration: function_definition
 
 
 // I made this myself
-function_compount_statment: '{' {symbol_table = $<st_node_pair>0.st; symbol_table->st_type = FUNC;} block_item_list '}' {shallow_pop_table(); $$ = $3;}
+function_compount_statment: '{' {
+                              symbol_table = $<st_node_pair>-1.st;
+                              symbol_table->st_type = FUNC;
+                              size_t i;
+                              for(i = 0; i<symbol_table->len; ++i){
+                                if(symbol_table->nodearr[i]->name == NULL) {
+                                    yyerror("Invalid abstract type for funciton definiton");
+                                    exit(2);
+                                }
+                              }
+                          } block_item_list '}' {shallow_pop_table(); $$ = $3;}
                           | '{' '}' {$$ = NULL;}
                           ;
 
@@ -1134,7 +1142,7 @@ function_definition: declaration_specifiers declarator declaration_list compound
                     yyerror("K&R Not Supported");
                     exit(2);
                  }// Optional
-                   | declaration_specifiers declarator function_compount_statment{
+                   | declaration_specifiers declarator {
                     struct Type *t = add_to_end_and_reverse($2.node.val.type, $1.val.type);
                     if (t->type != T_FUNC || $2.node.namespc != ORD) {
                         yyerror("Invalid Funciton Definiton");
@@ -1146,15 +1154,19 @@ function_definition: declaration_specifiers declarator declaration_list compound
                     struct SymbolTableNode * old_node;
                     int found;
                     if((found = find_in_table($2.node.name, ORD,symbol_table, &old_node)) && func_is_comp(old_node->val.type, current_node.val.type)) {
-                        old_node->val.type->extentions.func.statment = $3;
+                        /* old_node->val.type->extentions.func.statment = $3; */
+                        $<current_symbol>$ = *old_node;
                     } else if (!found) {
-                        current_node.val.type->extentions.func.statment = $3;
+                        /* current_node.val.type->extentions.func.statment = $3; */
                         enter_in_namespace(current_node, ORD);
+                        $<current_symbol>$ = current_node;
                     } else {
                         yyerror("funciton signature is not compatible");
                         exit(2);
                     }
 
+                   } function_compount_statment {
+                    $<current_symbol>3.val.type->extentions.func.statment = $4;
                    }
                    ;
 
