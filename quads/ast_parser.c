@@ -932,6 +932,34 @@ void parse_if_statment(struct BasicBlockArr *bba, struct IfStatment *if_s,
     branch_to_end->arg1.bbn = bba->len - 1;
 }
 
+void parse_function_call(struct BasicBlockArr *bba, struct FuncCall *func_call,
+                         struct Location *eq, struct JumpList **continue_list,
+                         struct JumpList **break_list) {
+    struct Location eq_r;
+    if (eq == NULL) {
+        eq_r = make_Location_reg();
+    } else {
+        eq_r = *eq;
+    }
+    append_quad(&CURRENT_BB,
+                make_quad(make_Location_empty_reg(), ARGBEGIN,
+                          make_Location_int((i64)func_call->argument_count),
+                          make_Location_empty_reg()));
+    i64 i;
+    struct AstNodeListNode *cur;
+    for (i = 0, cur = &func_call->arguments; cur != NULL;
+         ++i, cur = cur->next) {
+        struct Location arg2 = make_Location_reg();
+        int is_val = parse_ast(bba, cur->val, &arg2, continue_list, break_list);
+        arg2 = get_loc_from_parse_ast(is_val, cur->val, bba, NULL);
+        append_quad(&CURRENT_BB, make_quad(make_Location_empty_reg(), ARG,
+                                           make_Location_int(i), arg2));
+    }
+    append_quad(&CURRENT_BB,
+                make_quad(eq_r, CALL, make_Location_var(CURRENT_BB.ref),
+                          make_Location_empty_reg()));
+}
+
 int parse_ast(struct BasicBlockArr *bba, AstNode *ast, struct Location *eq,
               struct JumpList **continue_list, struct JumpList **break_list) {
     switch (ast->type) {
@@ -950,6 +978,8 @@ int parse_ast(struct BasicBlockArr *bba, AstNode *ast, struct Location *eq,
     case ASTNODE_TERNAYROP:
         break;
     case ASTNODE_FUNCCALL:
+        parse_function_call(bba, &ast->func_call, eq, continue_list,
+                            break_list);
         break;
     case ASTNODE_STATMENTLIST: {
         struct StatmentListNode *stln;
@@ -979,17 +1009,16 @@ int parse_ast(struct BasicBlockArr *bba, AstNode *ast, struct Location *eq,
         fprintf(stderr, "UNIMPLEMENTED\n");
         exit(3);
     case ASTNODE_CONTINUE_STATMENT:
-        *continue_list =
-            push_jump_list(*continue_list,
-                           append_quad(&bba->arr[bba->len - 1],
-                                       make_quad(make_Location_empty_reg(), BR,
-                                                 make_Location_BB(bba->len - 1),
-                                                 make_Location_empty_reg())));
+        *continue_list = push_jump_list(
+            *continue_list,
+            append_quad(&CURRENT_BB, make_quad(make_Location_empty_reg(), BR,
+                                               make_Location_BB(bba->len - 1),
+                                               make_Location_empty_reg())));
         break;
     case ASTNODE_BREAK_STATMENT:
         *break_list = push_jump_list(
-            *break_list, append_quad(&bba->arr[bba->len - 1],
-                                     make_quad(make_Location_empty_reg(), BR,
+            *break_list,
+            append_quad(&CURRENT_BB, make_quad(make_Location_empty_reg(), BR,
                                                make_Location_BB(bba->len - 1),
                                                make_Location_empty_reg())));
         break;

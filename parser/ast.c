@@ -503,6 +503,7 @@ AstNode *make_func_call(AstNode *name, struct AstNodeListNode *arguments) {
     ast->func_call.arguments = *prev;
     free(prev);
 
+    // TODO fix this to have a value_type
     ast->func_call.argument_count = i;
 
     return ast;

@@ -63,6 +63,9 @@ void realloc_BBA(struct BasicBlockArr *bba) {
     bba->arr = realloc(bba->arr, sizeof(struct BasicBlock) * bba->cap);
 }
 void append_basic_block(struct BasicBlockArr *bba, struct BasicBlock bb) {
+    if (bb.ref == NULL) {
+        bb.ref = bba->arr[bba->len - 1].ref;
+    }
     if (bba->len >= bba->cap) {
         realloc_BBA(bba);
     }
@@ -262,6 +265,18 @@ void print_op(enum Operation op) {
         break;
     case BR:
         printf("BR");
+        break;
+    case ARGBEGIN:
+        printf("ARGBEGIN");
+        break;
+    case ARG:
+        printf("ARG");
+        break;
+    case CALL:
+        printf("CALL");
+        break;
+    case RET:
+        printf("RET");
         break;
     }
 }

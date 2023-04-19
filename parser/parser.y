@@ -378,7 +378,9 @@ conditional_expression: logical_or_expression
 // 6.5.16
 assignment_expression: conditional_expression
                      | unary_expression assignment_operator assignment_expression {
+                        fprintf(stderr, "I get here\n");
                         $$ = make_binary_op($2, $1, $3);
+                        fprintf(stderr, "I get here 2\n");
                      }
                      ;
 assignment_operator: '=' {$$ = '=';}

@@ -84,8 +84,12 @@ enum Operation {
     CCGEU,  // 5 11
 
     //
-
     LOGNOT,
+    // function stuff
+    ARGBEGIN,
+    ARG,
+    CALL,
+    RET,
 };
 
 #define CMPLEN 6
