@@ -284,7 +284,8 @@ void print_op(enum Operation op) {
 void print_quad(struct Quad *q) {
     printf("Quad: ");
     print_location(&q->eq);
-    printf(" = ");
+    if (q->eq.loc_type != REG || q->eq.reg != EMPTY_VREG)
+        printf(" = ");
     print_op(q->op);
     printf(" ");
     print_location(&q->arg1);
