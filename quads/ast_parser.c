@@ -514,8 +514,6 @@ enum Operation get_op_from_child(struct BasicBlockArr *bba, AstNode *child,
 void parse_binary_op(struct BasicBlockArr *bba, struct BinaryOp *bop,
                      struct Location *eq, struct JumpList **continue_list,
                      struct JumpList **break_list) {
-    static size_t true_path;
-    static size_t false_path;
     struct Location eq_r;
     if (eq == NULL) {
         eq_r = make_Location_reg();
@@ -745,7 +743,6 @@ void parse_binary_op(struct BasicBlockArr *bba, struct BinaryOp *bop,
         // target_bbn = -1;
         append_basic_block(bba, make_bb(CURRENT_BB.ref));
         sad_path->arg1.bbn = bba->len - 1;
-        true_path = bba->len - 1;
         append_quad(&CURRENT_BB, make_quad(eq_r, MOV, make_Location_int(0),
                                            make_Location_empty_reg()));
         struct Quad *end =
@@ -754,7 +751,6 @@ void parse_binary_op(struct BasicBlockArr *bba, struct BinaryOp *bop,
                                                make_Location_empty_reg()));
         append_basic_block(bba, make_bb(CURRENT_BB.ref));
         happy_path->arg1.bbn = bba->len - 1;
-        false_path = bba->len - 1;
         append_quad(&CURRENT_BB, make_quad(eq_r, MOV, make_Location_int(1),
                                            make_Location_empty_reg()));
         append_basic_block(bba, make_bb(CURRENT_BB.ref));
@@ -770,7 +766,6 @@ void parse_binary_op(struct BasicBlockArr *bba, struct BinaryOp *bop,
         op = (get_op_from_child(bba, bop->right, continue_list, break_list));
         struct Quad *happy_path = replace_cc_with_br(bba, &op, bba->len - 1);
         append_basic_block(bba, make_bb(CURRENT_BB.ref));
-        true_path = bba->len - 1;
         append_quad(&CURRENT_BB, make_quad(eq_r, MOV, make_Location_int(0),
                                            make_Location_empty_reg()));
         struct Quad *end =
@@ -780,7 +775,6 @@ void parse_binary_op(struct BasicBlockArr *bba, struct BinaryOp *bop,
         append_basic_block(bba, make_bb(CURRENT_BB.ref));
         happy_path->arg1.bbn = bba->len - 1;
         sad_path->arg1.bbn = bba->len - 1;
-        false_path = bba->len - 1;
         append_quad(&CURRENT_BB, make_quad(eq_r, MOV, make_Location_int(1),
                                            make_Location_empty_reg()));
         append_basic_block(bba, make_bb(CURRENT_BB.ref));
@@ -996,8 +990,12 @@ void parse_function_call(struct BasicBlockArr *bba, struct FuncCall *func_call,
         append_quad(&CURRENT_BB, make_quad(make_Location_empty_reg(), ARG,
                                            make_Location_int(i), arg2));
     }
+    if (func_call->name->type != ASTNODE_IDENT) {
+        fprintf(stderr, "UNSPORTED: callable value is not an ident");
+        exit(3);
+    }
     append_quad(&CURRENT_BB,
-                make_quad(eq_r, CALL, make_Location_var(CURRENT_BB.ref),
+                make_quad(eq_r, CALL, make_Location_var(func_call->name->ident),
                           make_Location_empty_reg()));
 }
 
