@@ -278,6 +278,36 @@ void print_op(enum Operation op) {
     case RET:
         printf("RET");
         break;
+    case CVTBS:
+        printf("CVTBS");
+        break;
+    case CVTWS:
+        printf("CVTWS");
+        break;
+    case CVTLS:
+        printf("CVTLS");
+        break;
+    case CVTQS:
+        printf("CVTQS");
+        break;
+    case CVTBU:
+        printf("CVTBU");
+        break;
+    case CVTWU:
+        printf("CVTWU");
+        break;
+    case CVTLU:
+        printf("CVTLU");
+        break;
+    case CVTQU:
+        printf("CVTQU");
+        break;
+    case CVTFL:
+        printf("CVTFL");
+        break;
+    case CVTFQ:
+        printf("CVTFQ");
+        break;
     }
 }
 

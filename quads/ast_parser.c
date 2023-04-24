@@ -183,8 +183,10 @@ struct Location get_loc_pos_is_val(AstNode *node) {
         if (node->constant.type >= TDOUBLE &&
             node->constant.type <= TLONGDOUBLE) {
             result = make_Location_float(node->constant.val.flt);
-        } else
+        } else if (node->constant.type < TDOUBLE)
             result = make_Location_int(node->constant.val.u_int);
+        else
+            result = make_Location_int((i64)node->constant.val.chr);
 
     } else {
         result = make_Location_var(node->ident);
@@ -1008,6 +1010,61 @@ void parse_return_statment(struct BasicBlockArr *bba, AstNode *return_statment,
     append_quad(&CURRENT_BB, make_quad(make_Location_empty_reg(), RET, ret_val,
                                        make_Location_empty_reg()));
 }
+
+void parse_cast(struct BasicBlockArr *bba, struct CastStatment *cast_statment,
+                struct Location *eq, struct JumpList **continue_list,
+                struct JumpList **break_list) {
+    if (cast_statment->type_name->value_type->type == T_POINTER &&
+        cast_statment->val->value_type->type == T_POINTER) {
+        fprintf(stderr, "Warning converting non compatible pointer types\n");
+        return;
+    }
+    struct Location eq_r;
+    if (eq == NULL) {
+        eq_r = make_Location_reg();
+    } else {
+        eq_r = *eq;
+    }
+    enum Operation op;
+    int is_unsigned = 0;
+    int is_float = 0;
+    struct Type *cast_type = cast_statment->type_name->value_type;
+    if (cast_type->type == T_UNSIGNED) {
+        is_unsigned = 1;
+        cast_type = cast_type->extentions.next_type.next;
+    }
+    struct Type *last = get_last_from_next(cast_type);
+    if (cast_type->type == T_POINTER) {
+        op = CVTQS;
+    } else if (last->type == T_SHORT || cast_type->type == T_SHORT) {
+        op = CVTWS;
+    } else if (last->type == T_CHAR) {
+        op = CVTBS;
+    } else if (last->type == T_INT) {
+        op = cast_type->type == T_LONG ? CVTQS : CVTLS;
+    } else if (last->type == T_FLOAT) {
+        op = CVTFL;
+        is_float = 1;
+    } else if (last->type == T_DOUBLE) {
+        op = CVTFQ;
+        is_float = 1;
+    } else if (last->type == T_LONG) {
+        op = CVTQS;
+    }
+    if (is_unsigned && is_float) {
+        fprintf(stderr, "Can't add Unsigned to a float\n");
+        exit(3);
+    }
+    op += CASTLEN * is_unsigned;
+
+    fprintf(stderr, "got here op = %d\n", op);
+    int is_val =
+        parse_ast(bba, cast_statment->val, NULL, continue_list, break_list);
+    struct Location arg1 =
+        get_loc_from_parse_ast(is_val, cast_statment->val, bba, NULL);
+    append_quad(&CURRENT_BB,
+                make_quad(eq_r, op, arg1, make_Location_empty_reg()));
+}
 int parse_ast(struct BasicBlockArr *bba, AstNode *ast, struct Location *eq,
               struct JumpList **continue_list, struct JumpList **break_list) {
     switch (ast->type) {
@@ -1091,8 +1148,8 @@ int parse_ast(struct BasicBlockArr *bba, AstNode *ast, struct Location *eq,
         // should only have to do something
         // if I am going from floating point to integer
         // otherwise noop
-        return parse_ast(bba, ast->cast_statment.val, eq, continue_list,
-                         break_list);
+        parse_cast(bba, &ast->cast_statment, eq, continue_list, break_list);
+        break;
     }
     return 0;
 }

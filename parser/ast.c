@@ -209,7 +209,7 @@ struct Type *arithmatic_res_type(struct Type *left, struct Type *right,
                                  int *right_needs_cast) {
     if (left->type == T_POINTER || right->type == T_POINTER) {
         if (!allow_pointer) {
-            yyerror("Pointer type can'd do this arithmetic op");
+            yyerror("Pointer type can't do this arithmetic op");
             exit(2);
         }
         return pointer_arithmatic_res_type(left, right, left_needs_cast,
@@ -355,14 +355,33 @@ AstNode *make_binary_op(int op, AstNode *left, AstNode *right) {
         if (type_can_do_math(left->value_type) &&
             type_can_do_math(right->value_type)) {
             int left_cast, right_cast;
+            if (left->value_type->type == T_POINTER ||
+                right->value_type->type == T_POINTER) {
+
+                if ((left->value_type->type == T_POINTER &&
+                     right->value_type->type == T_POINTER) ||
+                    types_are_eq(left->value_type, right->value_type)) {
+                    if (left->value_type->type == T_POINTER &&
+                        right->value_type->type == T_POINTER) {
+                        yyerror("Warning: Implict cast to non equivilbant "
+                                "pointer types");
+                    }
+                    ast->value_type = left->value_type;
+                    return ast;
+                } else {
+                    yyerror("Invalid implicitn pointer converstion");
+                    exit(2);
+                }
+            }
             struct Type *res =
-                arithmatic_res_type(left->value_type, right->value_type, 1,
+                arithmatic_res_type(left->value_type, right->value_type, 0,
                                     &left_cast, &right_cast);
-            if (res == NULL || left_cast) {
+            if (res == NULL) {
                 yyerror("Invalid assignment operator");
                 exit(2);
             }
-            if (right_cast) {
+
+            if (right_cast || left_cast) {
                 bo->right =
                     make_CastStatment(right, make_Typename(left->value_type));
             }

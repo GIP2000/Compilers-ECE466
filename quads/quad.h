@@ -90,9 +90,24 @@ enum Operation {
     ARG,
     CALL,
     RET,
+    // Cast
+    CVTBS,
+    CVTWS,
+    CVTLS,
+    CVTQS,
+
+    CVTBU,
+    CVTWU,
+    CVTLU,
+    CVTQU,
+
+    CVTFL,
+    CVTFQ,
+
 };
 
 #define CMPLEN 6
+#define CASTLEN 4
 
 typedef int OpInverter[6];
 
