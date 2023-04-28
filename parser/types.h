@@ -59,6 +59,7 @@ struct Type {
             int is_struct;
             int is_cached;
             unsigned long long cached_size;
+            unsigned long long alignment_size;
         } st_un;
         struct {
             int initalized;

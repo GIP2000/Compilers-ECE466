@@ -52,22 +52,34 @@ struct Quad *replace_cc_with_br(struct BasicBlockArr *bba, enum Operation *op,
                                 size_t bbn);
 
 u64 get_struct_or_union_size(struct Type *t) {
-    if (t->extentions.st_un.is_cached)
-        return t->extentions.st_un.cached_size;
     if (t->extentions.st_un.is_struct)
         return get_struct_size(t);
     return get_union_size(t);
 }
 
 u64 get_union_size(struct Type *t) {
+    if (t->extentions.st_un.is_cached) {
+        return t->extentions.st_un.cached_size;
+    }
+    t->extentions.st_un.is_cached = 1;
     struct SymbolTable *mems = t->extentions.st_un.mem;
     size_t i;
-    u64 max = 0;
+    u64 max_size = 0;
+    u64 max_alignment = 0;
     for (i = 0; i < mems->len; ++i) {
-        u64 current = size_of_abstract(mems->nodearr[i]->val.type);
-        max = current > max ? current : max;
+        struct Type *current_type = mems->nodearr[i]->val.type;
+        u64 current = size_of_abstract(current_type);
+        while (current_type->type == T_ARR) {
+            current_type = current_type->extentions.next_type.next;
+        }
+        u64 current_alignment = size_of_abstract(current_type);
+        max_size = current > max_size ? current : max_size;
+        max_alignment = current_alignment > max_alignment ? current_alignment
+                                                          : max_alignment;
     }
-    return max + (max % 4);
+    t->extentions.st_un.cached_size = max_size;
+    t->extentions.st_un.alignment_size = max_alignment;
+    return max_size;
 }
 
 u64 get_struct_size(struct Type *t) {
@@ -77,26 +89,31 @@ u64 get_struct_size(struct Type *t) {
         return t->extentions.st_un.cached_size;
     }
     // generate and cache
-    struct SymbolTable *mems = t->extentions.st_un.mem;
-    size_t i;
-    u64 alignment = 0;
-    u64 total = 0;
-    for (i = 0; i < mems->len; ++i) {
-        u64 current = size_of_abstract(mems->nodearr[i]->val.type);
-
-        alignment += current;
-        if (alignment >= 4) {
-            if (alignment != 4)
-                total += 4 - (alignment - current);
-            alignment = 0;
-        }
-        mems->nodearr[i]->offset_marked = 1;
-        mems->nodearr[i]->offset = total;
-        total += current;
-    }
-    t->extentions.st_un.cached_size = total;
     t->extentions.st_un.is_cached = 1;
-    return total;
+    struct SymbolTable *mems = t->extentions.st_un.mem;
+    u64 size = 0;
+    u64 max_aligment = 0;
+    size_t i;
+    for (i = 0; i < mems->len; ++i) {
+        struct Type *current_type = mems->nodearr[i]->val.type;
+        u64 current_size = size_of_abstract(current_type);
+        while (current_type->type == T_ARR) {
+            current_type = current_type->extentions.next_type.next;
+        }
+        u64 this_alignment = size_of_abstract(current_type);
+        u64 padding =
+            (size + current_size) % this_alignment == 0
+                ? 0
+                : this_alignment - ((size + current_size) % this_alignment);
+        mems->nodearr[i]->offset = size + padding;
+        mems->nodearr[i]->offset_marked = 1;
+        size += padding + current_size;
+        max_aligment =
+            this_alignment > max_aligment ? this_alignment : max_aligment;
+    }
+    t->extentions.st_un.alignment_size = max_aligment;
+    t->extentions.st_un.cached_size = size;
+    return size;
 }
 
 u64 get_array_length(struct Type *t) {
