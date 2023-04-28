@@ -3,7 +3,7 @@
 #include <stdlib.h>
 
 VReg next_vreg = VREG_START;
-const size_t inital_cap = 100;
+const size_t INITAL_CAP = 100;
 
 struct Location make_Location_int(long long v) {
     struct Location l;
@@ -50,9 +50,7 @@ struct Location make_Location_var(struct SymbolTableNode *v) {
 
 struct BasicBlockArr initalize_BasicBlockArr(size_t inital_cap) {
     struct BasicBlockArr bba;
-    if (inital_cap == 0)
-        bba.cap = inital_cap;
-
+    bba.cap = inital_cap > 0 ? inital_cap : INITAL_CAP;
     bba.len = 0;
     bba.arr = (struct BasicBlock *)malloc(sizeof(struct BasicBlock) * bba.cap);
     return bba;
