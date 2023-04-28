@@ -1,5 +1,6 @@
 #pragma once
 #include "ast.h"
+#include <stdint.h>
 #include <stdlib.h>
 enum IdentType { VARIABLE, FUNCTION, TYPEDEFNAME, TAG, LABELNAME, MEMBER };
 
@@ -55,6 +56,8 @@ struct SymbolTableNode {
     enum Namespace namespc;
     enum IdentType type;
     struct DebugFileInfo fi;
+    int offset_marked;
+    unsigned long long offset;
     struct {
         // enum StorageClass sc;
         struct EffectiveStorageClass sc;

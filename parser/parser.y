@@ -129,8 +129,8 @@
 // Also Idents right now are very ugly but I don't want to fix them until I have to implement them fully
 
 // 6.4.4
-constant: NUMBER {$$ = make_AstNode(ASTNODE_CONSTANT); AstNode * n = $$; n->constant = $1;}
-        | CHARLIT {$$ = make_AstNode(ASTNODE_CONSTANT); AstNode * n = $$; n->constant = $1;}
+constant: NUMBER {$$ = make_ConstantType($1);}
+        | CHARLIT {$$ = make_ConstantType($1);}
         ;
 
 // 6.5.1
@@ -140,9 +140,10 @@ primary_expression: IDENT {
                   }// More work needed to figure out what its value is (if its an enum ... ) scoping and all that jazz
                   | constant
                   | STRING {
-                    $$ = make_AstNode(ASTNODE_STRLIT);
-                    AstNode * n = $$;
-                    n->strlit = $1;
+                    $$ = make_StringType($1);
+                    /* $$ = make_AstNode(ASTNODE_STRLIT); */
+                    /* AstNode * n = $$; */
+                    /* n->strlit = $1; */
                   }
                   | '(' expression ')' {$$ = $2;}
                   | generic_selection {yyerror("Not Implemented"); exit(1);}
@@ -167,14 +168,31 @@ postfix_expression: primary_expression
                       $$ = make_func_call($1, NULL);
                   }
                   | postfix_expression  '.' IDENT {
+                      if($1->value_type->type != T_STRUCT || $1->value_type->type == T_UNION) {
+                        yyerror("Invalid . operator must be used with a struct or union");
+                        exit(2);
+                      }
+                      struct SymbolTable * old = symbol_table;
+                      symbol_table = $1->value_type->extentions.st_un.mem;
                       $$ = make_binary_op('.', $1, make_IdentNode($3));
+                      symbol_table = old;
                       /* $$ = make_binary_op('.', $1, make_IdentNode($<str>3)); */
                   }
                   | postfix_expression INDSEL IDENT {
-                    AstNode * deref = make_unary_op('*', $1);
-                    AstNode * ident = make_IdentNode($3);
+                      if($1->value_type->type != T_POINTER &&
+                          ($1->value_type->extentions.next_type.next->type == T_STRUCT
+                            || $1->value_type->extentions.next_type.next->type == T_UNION )) {
+                        yyerror("Invalid . operator must be used with a struct or union");
+                        exit(2);
+                      }
+                    struct SymbolTable * old = symbol_table;
+                    symbol_table = $1->value_type->extentions.next_type.next->extentions.st_un.mem;
+                    $$ = make_binary_op(INDSEL, $1, make_IdentNode($3));
+                    symbol_table = old;
+                    /* AstNode * deref = make_unary_op('*', $1); */
+                    /* AstNode * ident = make_IdentNode($3); */
                     /* AstNode * ident = make_IdentNode($<str>3); */
-                    $$ = make_binary_op('.', deref, ident);
+                    /* $$ = make_binary_op('.', deref, ident); */
                   }
                   | postfix_expression PLUSPLUS {
                       $$ = make_unary_op(PLUSPLUS, $1);
@@ -202,23 +220,21 @@ argument_expression_list: assignment_expression {
 // 6.5.3
 unary_expression: postfix_expression
                 | PLUSPLUS unary_expression {
-                    AstNode * node  = make_AstNode(ASTNODE_CONSTANT);
                     NVal n;
                     n.u_int = 1;
                     YYlvalNumLit nl;
                     nl.type = TINT;
                     nl.val = n;
-                    node->constant = nl;
+                    AstNode * node = make_ConstantType(nl);
                     $$ = make_binary_op(PLUSEQ, $2, node);
                 }
                 | MINUSMINUS unary_expression {
-                    AstNode * node  = make_AstNode(ASTNODE_CONSTANT);
                     NVal n;
                     n.u_int = 1;
                     YYlvalNumLit nl;
                     nl.type = TINT;
                     nl.val = n;
-                    node->constant = nl;
+                    AstNode * node = make_ConstantType(nl);
                     $$ = make_binary_op(MINUSEQ, $2, node);
                 }
                 | unary_operator cast_expression {
@@ -461,7 +477,9 @@ init_declarator_list: init_declarator {
                         /*     shallow_pop_table(); */
                         /* } */
                         struct SymbolTableNode *n = $1->statments.head->node->declaration.symbol;
-                        struct Type * t = add_to_end_and_reverse($3.val.type, n->val.type);
+                        struct Type * t_to_add;
+                        for(t_to_add = n->val.type; t_to_add != NULL && (t_to_add->type == T_POINTER || t_to_add->type == T_ARR); t_to_add = t_to_add->extentions.next_type.next) {}
+                        struct Type * t = add_to_end_and_reverse($3.val.type, t_to_add);
                         struct SymbolTableNode node = make_st_node($3.name, $3.namespc, $3.type, n->val.sc, t,$3.val.initalizer);
                         if(!enter_in_namespace(node, ORD)) { //TODO ord is Temporary
                            yyerror("Varaible redefinition");
@@ -662,6 +680,7 @@ alignment_specifier: _ALIGNAS '(' type_name ')' {
 
 // 6.7.6
 declarator: pointer direct_declarator {
+
           if($2.node.val.type != NULL) {
             struct Type * t = $2.node.val.type->type == T_FUNC ? $2.node.val.type : get_last_from_next($2.node.val.type);
             if (t->type == T_FUNC) {
@@ -704,6 +723,7 @@ direct_declarator: IDENT {
                  | direct_declarator '[' assignment_expression ']' {
                     /* $1.val.type = merge_if_next($1.val.type, make_next_type(T_ARR, NULL)); */
                     $1.node.val.type = make_next_type(T_ARR, $1.node.val.type);
+                    $1.node.val.type->extentions.next_type.arr_size_expression = $3;
                     $$ = $1;
                  }
                  | direct_declarator '[' ']' {
@@ -756,6 +776,7 @@ direct_declarator: IDENT {
                         $1.st = symbol_table;
                     }
                     $1.node.val.type = t;
+                    $1.node.type = FUNCTION;
                     shallow_pop_table();
 
                     $$ = $1;
@@ -767,6 +788,7 @@ direct_declarator: IDENT {
                  | direct_declarator '(' {create_scope(PROTOTYPE);} ')' {
                     $1.st = shallow_pop_table();
                     $1.node.val.type = make_func_type(NULL, NULL, 0);
+                    $1.node.type = FUNCTION;
                     $$ = $1;
                  }
                  ;
@@ -851,7 +873,6 @@ abstract_declarator: pointer {
                       }
                    }// Optional
                    | direct_abstract_declarator {
-                       fprintf(stderr, "No pointer\n");
                        $$ = $1;
                    }
                    ;
@@ -938,20 +959,22 @@ direct_abstract_declarator: '(' abstract_declarator ')' {$$ = $2;}
                                 $1.st = symbol_table;
                             }
                             $1.node.val.type = t;
+                            $1.node.type = FUNCTION;
                             shallow_pop_table();
                             $$ = $1;
                           }// Double Optional
                           | direct_abstract_declarator '(' {create_scope(PROTOTYPE);} ')' {
                             $1.st = shallow_pop_table();
                             $1.node.val.type = make_func_type(NULL, NULL, 0);
+                            $1.node.type = FUNCTION;
                             $$ = $1;
                           }
                           |  '(' {create_scope(PROTOTYPE);} parameter_type_list ')'{
-                              $$ = make_st_node_pair(make_st_node(NULL, ORD, 0, get_default_sc(), make_func_type(NULL, symbol_table, $3), NULL));
+                              $$ = make_st_node_pair(make_st_node(NULL, ORD, FUNCTION, get_default_sc(), make_func_type(NULL, symbol_table, $3), NULL));
                               $$.st = shallow_pop_table();
                           }
                           | '('{create_scope(PROTOTYPE);} ')' {
-                             $$ = make_st_node_pair(make_st_node(NULL, ORD, 0, get_default_sc(), make_func_type(NULL, NULL, 0), NULL));
+                             $$ = make_st_node_pair(make_st_node(NULL, ORD, FUNCTION, get_default_sc(), make_func_type(NULL, NULL, 0), NULL));
                              $$.st = shallow_pop_table();
                           }
                           ;
@@ -1101,7 +1124,17 @@ external_declaration: function_definition
 
 
 // I made this myself
-function_compount_statment: '{' {symbol_table = $<st_node_pair>0.st; symbol_table->st_type = FUNC;} block_item_list '}' {shallow_pop_table(); $$ = $3;}
+function_compount_statment: '{' {
+                              symbol_table = $<st_node_pair>-1.st;
+                              symbol_table->st_type = FUNC;
+                              size_t i;
+                              for(i = 0; i<symbol_table->len; ++i){
+                                if(symbol_table->nodearr[i]->name == NULL) {
+                                    yyerror("Invalid abstract type for funciton definiton");
+                                    exit(2);
+                                }
+                              }
+                          } block_item_list '}' {shallow_pop_table(); $$ = $3;}
                           | '{' '}' {$$ = NULL;}
                           ;
 
@@ -1109,7 +1142,7 @@ function_definition: declaration_specifiers declarator declaration_list compound
                     yyerror("K&R Not Supported");
                     exit(2);
                  }// Optional
-                   | declaration_specifiers declarator function_compount_statment{
+                   | declaration_specifiers declarator {
                     struct Type *t = add_to_end_and_reverse($2.node.val.type, $1.val.type);
                     if (t->type != T_FUNC || $2.node.namespc != ORD) {
                         yyerror("Invalid Funciton Definiton");
@@ -1121,15 +1154,19 @@ function_definition: declaration_specifiers declarator declaration_list compound
                     struct SymbolTableNode * old_node;
                     int found;
                     if((found = find_in_table($2.node.name, ORD,symbol_table, &old_node)) && func_is_comp(old_node->val.type, current_node.val.type)) {
-                        old_node->val.type->extentions.func.statment = $3;
+                        /* old_node->val.type->extentions.func.statment = $3; */
+                        $<current_symbol>$ = *old_node;
                     } else if (!found) {
-                        current_node.val.type->extentions.func.statment = $3;
+                        /* current_node.val.type->extentions.func.statment = $3; */
                         enter_in_namespace(current_node, ORD);
+                        $<current_symbol>$ = current_node;
                     } else {
                         yyerror("funciton signature is not compatible");
                         exit(2);
                     }
 
+                   } function_compount_statment {
+                    $<current_symbol>3.val.type->extentions.func.statment = $4;
                    }
                    ;
 

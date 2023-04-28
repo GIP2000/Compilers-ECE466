@@ -216,6 +216,8 @@ struct SymbolTableNode make_st_node(char *name, enum Namespace namespc,
                                     struct AstNode *initalizer) {
     struct SymbolTableNode n;
     n.name = name;
+    n.offset = 0;
+    n.offset_marked = 0;
     n.namespc = namespc;
     n.type = ident_type;
     n.val.initalizer = initalizer;

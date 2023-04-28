@@ -1,7 +1,9 @@
 #include "./ast.h"
 #include "../lexer/file_info.h"
+#include "../macro_util.h"
 #include "../parser.tab.h"
 #include "symbol_table.h"
+#include "yylval_types.h"
 #include <ctype.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -9,16 +11,258 @@
 
 extern FileInfo file_info;
 extern int yylineno;
-
 extern struct SymbolTable *symbol_table;
+
+struct Type TTUCHAR;
+struct Type TTULONG;
+int initalized = 0;
+int initalized_str = 0;
+
+#define INITALIZE(init, type_name, next_type_val)                              \
+    (init).qualifier_bit_mask = 0;                                             \
+    (init).type = (type_name);                                                 \
+    (init).extentions.next_type.next = (next_type_val);
+
+void promote_arr(AstNode *arr) {
+    if (arr->value_type->type == T_ARR) {
+        struct Type *ptr = make_next_type(
+            T_POINTER, arr->value_type->extentions.next_type.next);
+        arr->value_type = ptr;
+    }
+}
 
 AstNode *make_AstNode(int type) {
     AstNode *node = (AstNode *)malloc(sizeof(AstNode));
     node->type = type;
+    node->value_type = NULL;
     node->fi.file_name = file_info.file_name;
     node->fi.ln =
         yylineno - file_info.real_line_start + file_info.file_line_start;
     return node;
+}
+
+AstNode *make_ConstantType(YYlvalNumLit numlit) {
+    static struct Type TTINT;
+    static struct Type TTLONG;
+    static struct Type TTLONGLONG;
+    static struct Type TTUINT;
+    static struct Type TTULONGLONG;
+    static struct Type TTDOUBLE;
+    static struct Type TTFLOAT;
+    static struct Type TTLONGDOUBLE;
+
+    AstNode *ast = make_AstNode(ASTNODE_CONSTANT);
+    ast->constant = numlit;
+
+    if (!initalized) {
+        initalized = 1;
+        INITALIZE(TTINT, T_INT, NULL)
+        INITALIZE(TTLONG, T_LONG, &TTINT)
+        INITALIZE(TTLONGLONG, T_LONG, &TTLONG)
+        INITALIZE(TTUINT, T_UNSIGNED, &TTINT)
+        INITALIZE(TTULONG, T_LONG, &TTUINT)
+        INITALIZE(TTULONGLONG, T_LONG, &TTULONG)
+        INITALIZE(TTDOUBLE, T_DOUBLE, NULL)
+        INITALIZE(TTFLOAT, T_FLOAT, NULL)
+        INITALIZE(TTLONGDOUBLE, T_LONG, &TTDOUBLE)
+        INITALIZE(TTUCHAR, T_CHAR, NULL)
+    }
+
+    switch (numlit.type) {
+    case TINT:
+        ast->value_type = &TTINT;
+        break;
+    case TLONG:
+        ast->value_type = &TTLONG;
+        break;
+    case TLONGLONG:
+        ast->value_type = &TTLONGLONG;
+        break;
+    case TUINT:
+        ast->value_type = &TTUINT;
+        break;
+    case TULONG:
+        ast->value_type = &TTULONG;
+        break;
+    case TULONGLONG:
+        ast->value_type = &TTULONGLONG;
+        break;
+    case TDOUBLE:
+        ast->value_type = &TTDOUBLE;
+        break;
+    case TFLOAT:
+        ast->value_type = &TTFLOAT;
+        break;
+    case TLONGDOUBLE:
+        ast->value_type = &TTLONGDOUBLE;
+        break;
+    case TUCHAR:
+        ast->value_type = &TTUCHAR;
+        break;
+    default:
+        fprintf(stderr, "UNREACHABLE\n");
+        exit(1);
+    }
+    return ast;
+}
+
+AstNode *make_StringType(YYlvalStrLit strlit) {
+    static struct Type TTSTR;
+    if (initalized_str) {
+        INITALIZE(TTSTR, T_POINTER, &TTUCHAR)
+    }
+    AstNode *ast = make_AstNode(ASTNODE_STRLIT);
+    ast->strlit = strlit;
+    ast->value_type = &TTSTR;
+    return ast;
+}
+
+int type_can_do_math(struct Type *t) {
+    return t->type > T_LABEL && t->type <= T_LONG;
+}
+
+int get_long_len(struct Type *t, int *has_unsigned) {
+    struct Type *cur;
+    int i;
+    int has_unsigned_l = 0;
+    int signed_count = 0;
+    for (cur = t, i = 0;
+         cur != NULL && cur->type > T_POINTER && cur->type <= T_LONG;
+         ++i, cur = cur->extentions.next_type.next) {
+
+        if (cur->type == T_UNSIGNED) {
+            has_unsigned_l = 1;
+        }
+        if (cur->type == T_SIGNED) {
+            signed_count++;
+        }
+    }
+    PTR_RETURN(has_unsigned, has_unsigned_l)
+    return i - signed_count;
+}
+
+int types_are_eq(struct Type *left, struct Type *right) {
+    struct Type *cur_left;
+    struct Type *cur_right;
+    for (cur_left = left, cur_right = right;
+         (cur_left != NULL && cur_left->type >= T_POINTER &&
+          cur_left->type <= T_TYPEDEF) &&
+         (cur_right != NULL && cur_right->type >= T_POINTER &&
+          cur_right->type <= T_TYPEDEF);
+         cur_left = cur_left->extentions.next_type.next,
+        cur_right = cur_right->extentions.next_type.next) {
+        if (cur_left->type != cur_right->type) {
+            return 0;
+        }
+    }
+    if (cur_right == NULL && cur_left == NULL)
+        return 1;
+    if (cur_right != NULL && cur_left != NULL &&
+        cur_right->type == cur_left->type) {
+        return 1;
+    }
+    return 0;
+}
+
+struct Type *pointer_arithmatic_res_type(struct Type *left, struct Type *right,
+                                         int *left_needs_cast,
+                                         int *right_needs_cast) {
+    if (left->type == T_POINTER && right->type == T_POINTER) {
+        if (types_are_eq(left, right)) {
+            PTR_RETURN(left_needs_cast, 0)
+            PTR_RETURN(right_needs_cast, 0)
+            return &TTULONG;
+        }
+        return NULL;
+    }
+
+    struct Type *ptr;
+    struct Type *must_be_int;
+    int *ptr_needs_cast;
+    int *int_needs_cast;
+
+    if (left->type == T_POINTER) {
+        ptr = left;
+        must_be_int = right;
+        ptr_needs_cast = left_needs_cast;
+        int_needs_cast = right_needs_cast;
+    } else {
+        ptr = right;
+        must_be_int = left;
+        ptr_needs_cast = right_needs_cast;
+        int_needs_cast = left_needs_cast;
+    }
+
+    // make sure must_be_int is a ptr
+    enum Types itype = get_last_from_next(must_be_int)->type;
+    if (itype != T_INT && itype != T_SHORT && itype != T_CHAR) {
+        return NULL;
+    }
+
+    PTR_RETURN(int_needs_cast, must_be_int->type != T_INT);
+    PTR_RETURN(ptr_needs_cast, 0);
+    return ptr;
+}
+
+struct Type *arithmatic_res_type(struct Type *left, struct Type *right,
+                                 int allow_pointer, int *left_needs_cast,
+                                 int *right_needs_cast) {
+    if (left->type == T_POINTER || right->type == T_POINTER) {
+        if (!allow_pointer) {
+            yyerror("Pointer type can't do this arithmetic op");
+            exit(2);
+        }
+        return pointer_arithmatic_res_type(left, right, left_needs_cast,
+                                           right_needs_cast);
+    }
+    if (!type_can_do_math(left) || !type_can_do_math(right)) {
+        return NULL;
+    }
+    // if they aren't they same base type
+    enum Types l_left;
+    enum Types l_right;
+    if ((l_left = get_last_from_next(left)->type) !=
+        (l_right = get_last_from_next(right)->type)) {
+        if (l_left - l_right > 0) {
+            PTR_RETURN(left_needs_cast, 0)
+            PTR_RETURN(right_needs_cast, 1)
+            return left;
+        }
+        PTR_RETURN(left_needs_cast, 1)
+        PTR_RETURN(right_needs_cast, 0)
+        return right;
+    }
+
+    // if they are the same base type
+    int left_has_unsigned;
+    int right_has_unsigned;
+    int left_len = get_long_len(left, &left_has_unsigned) - left_has_unsigned;
+    int right_len =
+        get_long_len(right, &right_has_unsigned) - right_has_unsigned;
+
+    if (left_len < right_len) {
+        PTR_RETURN(left_needs_cast, 1)
+        PTR_RETURN(right_needs_cast, 0)
+        return right;
+    }
+    if (left_len > right_len) {
+        PTR_RETURN(left_needs_cast, 0)
+        PTR_RETURN(right_needs_cast, 1)
+        return left;
+    }
+    if (left_has_unsigned < right_has_unsigned) {
+        PTR_RETURN(left_needs_cast, 1)
+        PTR_RETURN(right_needs_cast, 0)
+        return right;
+    }
+    if (left_has_unsigned > right_has_unsigned) {
+        PTR_RETURN(left_needs_cast, 0)
+        PTR_RETURN(right_needs_cast, 1)
+        return left;
+    }
+    PTR_RETURN(left_needs_cast, 0)
+    PTR_RETURN(right_needs_cast, 0)
+    return left;
 }
 
 AstNode *make_binary_op(int op, AstNode *left, AstNode *right) {
@@ -27,7 +271,126 @@ AstNode *make_binary_op(int op, AstNode *left, AstNode *right) {
     bo->op = op;
     bo->left = left;
     bo->right = right;
-    return ast;
+    promote_arr(bo->left);
+    promote_arr(bo->right);
+
+    // math binary ops
+    if (op == '+' || op == '-' || op == '*' || op == '/' || op == PLUSEQ ||
+        op == MINUSEQ || op == TIMESEQ || op == DIVEQ || op == EQEQ ||
+        op == NOTEQ || op == '<' || op == LTEQ || op == '>' || op == GTEQ) {
+        int left_cast;
+        int right_cast;
+        if ((ast->value_type = arithmatic_res_type(
+                 left->value_type, right->value_type,
+                 op == '+' || op == '-' || op == PLUSEQ || op == MINUSEQ ||
+                     op == EQEQ || op == NOTEQ || op == '<' || op == LTEQ ||
+                     op == '>' || op == GTEQ,
+                 &left_cast, &right_cast)) == NULL) {
+            yyerror("Invalid arugment for math expression");
+            exit(2);
+        };
+        // add the cast in there
+        if (left_cast) {
+            bo->left =
+                make_CastStatment(left, make_Typename(right->value_type));
+        }
+        if (right_cast) {
+            bo->right =
+                make_CastStatment(right, make_Typename(left->value_type));
+        }
+
+        return ast;
+    }
+    // Integer only
+    if (op == '%' || op == LOGAND || op == LOGOR || op == MODEQ ||
+        op == SHLEQ || op == SHREQ || op == ANDEQ || op == XOREQ ||
+        op == OREQ || op == '&' || op == '|' || op == '^' || op == SHL ||
+        op == SHR) {
+        if (get_last_from_next(left->value_type)->type != T_INT ||
+            get_last_from_next(right->value_type)->type != T_INT) {
+            yyerror("Invalid Type for Integer only expression");
+            exit(2);
+        }
+        int left_cast;
+        int right_cast;
+        ast->value_type = arithmatic_res_type(
+            left->value_type, right->value_type, 0, &left_cast, &right_cast);
+        // add the cast in there
+        if (left_cast) {
+            bo->left =
+                make_CastStatment(left, make_Typename(right->value_type));
+        }
+        if (right_cast) {
+            bo->right =
+                make_CastStatment(right, make_Typename(left->value_type));
+        }
+        return ast;
+    }
+
+    if (op == '.' || op == INDSEL) {
+        struct Type *left_type = left->value_type;
+        if (op == INDSEL) {
+            if (left_type->type != T_POINTER) {
+                yyerror("Tried to -> a non pointer type");
+                exit(2);
+            }
+            left_type = left_type->extentions.next_type.next;
+        }
+        // check normal struct stuff
+        if (left_type->type != T_STRUCT && left_type->type != T_UNION) {
+            yyerror("Tried to select a non struct or union");
+            exit(2);
+        }
+        ast->value_type = right->value_type;
+        return ast;
+    }
+    if (op == ',')
+        return ast;
+
+    if (op == '=') {
+        if (types_are_eq(left->value_type, right->value_type)) {
+            ast->value_type = left->value_type;
+            return ast;
+        }
+        if (type_can_do_math(left->value_type) &&
+            type_can_do_math(right->value_type)) {
+            int left_cast, right_cast;
+            if (left->value_type->type == T_POINTER ||
+                right->value_type->type == T_POINTER) {
+
+                if ((left->value_type->type == T_POINTER &&
+                     right->value_type->type == T_POINTER) ||
+                    types_are_eq(left->value_type, right->value_type)) {
+                    if (left->value_type->type == T_POINTER &&
+                        right->value_type->type == T_POINTER) {
+                        yyerror("Warning: Implict cast to non equivilbant "
+                                "pointer types");
+                    }
+                    ast->value_type = left->value_type;
+                    return ast;
+                } else {
+                    yyerror("Invalid implicitn pointer converstion");
+                    exit(2);
+                }
+            }
+            struct Type *res =
+                arithmatic_res_type(left->value_type, right->value_type, 0,
+                                    &left_cast, &right_cast);
+            if (res == NULL) {
+                yyerror("Invalid assignment operator");
+                exit(2);
+            }
+
+            if (right_cast || left_cast) {
+                bo->right =
+                    make_CastStatment(right, make_Typename(left->value_type));
+            }
+            ast->value_type = left->value_type;
+            return ast;
+        }
+    }
+    fprintf(stderr, "Unsuportted op = %d", op);
+    exit(1);
 }
 
 AstNode *make_unary_op(int op, AstNode *child) {
@@ -35,6 +398,84 @@ AstNode *make_unary_op(int op, AstNode *child) {
     struct UnaryOp *uo = &ast->unary_op;
     uo->op = op;
     uo->child = child;
+
+    switch (op) {
+    case '*': {
+        if (child->value_type->type != T_POINTER) {
+            yyerror("Invalid Argument to Dref Operator");
+            exit(2);
+        }
+        ast->value_type = child->value_type->extentions.next_type.next;
+        promote_arr(ast);
+        return ast;
+    }
+    case '&': {
+        // this will never be freed should likely make an allocator or something
+        // if I was concerned with that. But we'll leak for now
+        struct Type *ptr = make_next_type(T_POINTER, child->value_type);
+        ast->value_type = ptr;
+        return ast;
+    } break;
+    case '+':
+        if (!type_can_do_math(child->value_type)) {
+            yyerror("Invalid Argument to +");
+            exit(2);
+        }
+        break;
+    case '-': {
+        if (!type_can_do_math(child->value_type)) {
+            yyerror("Invalid Argument to -");
+            exit(2);
+        }
+    } break;
+    case '~':
+        if (!(get_last_from_next(child->value_type)->type == T_INT)) {
+            yyerror("Invalid Argument to ~");
+            exit(2);
+        }
+        break;
+    case '!':
+        if (!(get_last_from_next(child->value_type)->type == T_INT)) {
+            yyerror("Invalid Argument to !");
+            exit(2);
+        }
+        break;
+    case PLUSEQ:
+        if (!type_can_do_math(child->value_type)) {
+            yyerror("Invalid Argument to +=");
+            exit(2);
+        }
+        break;
+    case MINUSEQ:
+        if (!type_can_do_math(child->value_type)) {
+            yyerror("Invalid Argument to -=");
+            exit(2);
+        }
+        break;
+    case PLUSPLUS:
+        if (!(get_last_from_next(child->value_type)->type == T_INT)) {
+            yyerror("Invalid Argument to ++");
+            exit(2);
+        }
+        break;
+    case MINUSMINUS:
+        if (!(get_last_from_next(child->value_type)->type == T_INT)) {
+            yyerror("Invalid Argument to --");
+            exit(2);
+        }
+        break;
+    case SIZEOF:
+        // let everything through for now
+        // don't promote array
+        ast->value_type = child->value_type;
+        return ast;
+        break;
+    default:
+        fprintf(stderr, "UNREACHABLE\n");
+        exit(1);
+    }
+    ast->value_type = child->value_type;
+    promote_arr(ast);
     return ast;
 }
 
@@ -45,6 +486,7 @@ AstNode *make_IdentNode(YYlvalStrLit val) {
         yyerror("Ident referenced before assignment");
         exit(2);
     };
+    ast->value_type = ast->ident->val.type;
     return ast;
 }
 
@@ -53,10 +495,21 @@ AstNode *make_ternary_op(AstNode *cond, AstNode *truthy, AstNode *falsey) {
     ast->ternary_op.cond = cond;
     ast->ternary_op.truthy = truthy;
     ast->ternary_op.falsey = falsey;
+    if (!(cond->value_type->type == T_INT ||
+          (cond->value_type->type == T_LONG &&
+           get_last_from_next(cond->value_type)->type == T_INT))) {
+        yyerror("Invalid Argument");
+        exit(2);
+    }
+
     return ast;
 }
 
 AstNode *make_func_call(AstNode *name, struct AstNodeListNode *arguments) {
+    if (name->value_type->type != T_FUNC) {
+        yyerror("value is not callbable");
+        exit(2);
+    }
     AstNode *ast = make_AstNode(ASTNODE_FUNCCALL);
     ast->func_call.name = name;
     if (arguments == NULL) {
@@ -75,6 +528,7 @@ AstNode *make_func_call(AstNode *name, struct AstNodeListNode *arguments) {
     ast->func_call.arguments = *prev;
     free(prev);
 
+    ast->value_type = name->value_type->extentions.func.ret;
     ast->func_call.argument_count = i;
 
     return ast;
@@ -173,6 +627,19 @@ AstNode *make_CaseStatment(AstNode *cmp, AstNode *statment) {
 AstNode *make_DefaultStatment(AstNode *statment) {
     AstNode *ast = make_AstNode(ASTNODE_DEFAULT_STATMENT);
     ast->deafult_statment = statment;
+    return ast;
+}
+
+AstNode *make_CastStatment(AstNode *val, AstNode *type_name) {
+    AstNode *ast = make_AstNode(ASTNODE_CAST);
+    ast->cast_statment.val = val;
+    ast->cast_statment.type_name = type_name;
+    ast->value_type = type_name->value_type;
+    return ast;
+}
+AstNode *make_Typename(struct Type *type_name) {
+    AstNode *ast = make_AstNode(ASTNODE_TYPENAME);
+    ast->value_type = type_name;
     return ast;
 }
 
@@ -306,11 +773,13 @@ void print_AstNode(AstNode *head, unsigned int tab_count) {
     printf("%s:%d: ", head->fi.file_name, head->fi.ln);
     switch (head->type) {
     case ASTNODE_CONSTANT:
-        printf("Constant ");
+        printf("Constant of type ");
+        print_type(head->value_type);
+        printf(" = ");
         if (head->constant.type < 3) {
             printf("%lld", (long long)head->constant.val.u_int);
         } else if (head->constant.type < 6) {
-            printf("%lld", head->constant.val.u_int);
+            printf("%llu", head->constant.val.u_int);
         } else if (head->constant.type < 9) {
             printf("%Lg", head->constant.val.flt);
         } else {
@@ -455,6 +924,20 @@ void print_AstNode(AstNode *head, unsigned int tab_count) {
         printf("Deafult Statment :\n");
         print_AstNode(head->deafult_statment, tab_count + 1);
         return;
+    case ASTNODE_CAST:
+        printf("Cast Statment: \n");
+        print_AstNode(head->cast_statment.val, tab_count + 1);
+        add_tab(tab_count);
+        printf("as: \n");
+        add_tab(tab_count + 1);
+        print_type(head->cast_statment.type_name->value_type);
+        return;
+    case ASTNODE_TYPENAME:
+        printf("Type :\n");
+        add_tab(tab_count + 1);
+        print_type(head->value_type);
+        return;
+
     default:
         fprintf(stderr, "Unsuportted Node type %d\n", head->type);
         exit(1);
