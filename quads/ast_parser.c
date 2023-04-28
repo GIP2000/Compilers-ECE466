@@ -4,9 +4,6 @@
 #include "./quad.h"
 #include <stdio.h>
 
-// static long int target_bbn = -1;
-// int in_chain = 0;
-// #define CURRENT_BB bba->arr[target_bbn >= 0 ? target_bbn : bba->len - 1]
 #define CURRENT_BB bba->arr[bba->len - 1]
 
 struct JumpList {
@@ -159,7 +156,6 @@ u64 size_of_abstract(struct Type *t) {
 
 struct BasicBlockArr build_bba_from_st(struct SymbolTable *st) {
     struct BasicBlockArr bba = initalize_BasicBlockArr(100);
-
     size_t i;
     for (i = 0; i < st->len; ++i) {
         if (st->nodearr[i]->type != FUNCTION ||

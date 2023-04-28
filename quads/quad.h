@@ -13,6 +13,14 @@ typedef unsigned int VReg;
 
 enum LocationType { REG, VAR, CONSTINT, CONSTFLOAT, BASICBLOCKNUM };
 
+struct VRegCounter {
+    size_t cap;
+    struct VRegCounterNode {
+        size_t count;
+        int real_reg;
+    } *arr;
+};
+
 struct Location {
     enum LocationType loc_type; // 0 if reg 1 if var
     int deref;
@@ -135,6 +143,7 @@ struct BasicBlockArr {
     size_t len;
 };
 
+void debug_print_vrc();
 struct Location make_Location_int(long long v);
 struct Location make_Location_float(long double v);
 struct Location make_Location_reg();

@@ -1,9 +1,51 @@
 #include "./quad.h"
 #include <stdio.h>
 #include <stdlib.h>
+#include <string.h>
 
 VReg next_vreg = VREG_START;
 const size_t INITAL_CAP = 100;
+
+struct VRegCounter v_reg_counter;
+
+void debug_print_vrc() {
+    size_t i;
+    for (i = 0; i < v_reg_counter.cap; ++i) {
+        fprintf(stderr, "%%T%zu = %zu\n", i, v_reg_counter.arr[i].count);
+    }
+}
+
+void initalize_counter() {
+    static int first = 1;
+    if (!first) {
+        first = 0;
+        v_reg_counter.cap = 100;
+        free(v_reg_counter.arr);
+    }
+    v_reg_counter.cap = 100;
+    v_reg_counter.arr = (struct VRegCounterNode *)malloc(
+        sizeof(struct VRegCounterNode) * v_reg_counter.cap);
+    memset(v_reg_counter.arr, 0, v_reg_counter.cap);
+}
+
+void increment_location(struct Location l) {
+    if (!(l.loc_type == REG && l.reg != EMPTY_VREG)) {
+        return;
+    }
+    if (v_reg_counter.cap <= l.reg) {
+        size_t old_cap = v_reg_counter.cap;
+        v_reg_counter.cap = l.reg * 2;
+        v_reg_counter.arr = realloc(v_reg_counter.arr, v_reg_counter.cap);
+        memset(v_reg_counter.arr + v_reg_counter.cap, 0,
+               v_reg_counter.cap - old_cap);
+    }
+    ++v_reg_counter.arr[l.reg].count;
+}
+void increment_quad_locs(struct Quad quad) {
+    increment_location(quad.eq);
+    increment_location(quad.arg1);
+    increment_location(quad.arg2);
+}
 
 struct Location make_Location_int(long long v) {
     struct Location l;
@@ -53,6 +95,7 @@ struct BasicBlockArr initalize_BasicBlockArr(size_t inital_cap) {
     bba.cap = inital_cap > 0 ? inital_cap : INITAL_CAP;
     bba.len = 0;
     bba.arr = (struct BasicBlock *)malloc(sizeof(struct BasicBlock) * bba.cap);
+    initalize_counter();
     return bba;
 }
 
@@ -99,6 +142,8 @@ struct Quad *append_quad(struct BasicBlock *bb, struct Quad quad) {
         bb->tail->next = qn;
     }
     bb->tail = qn;
+    increment_quad_locs(quad);
+
     return &bb->tail->quad;
 }
 
