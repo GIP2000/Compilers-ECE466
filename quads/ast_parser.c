@@ -923,30 +923,17 @@ void parse_for_loop(struct BasicBlockArr *bba, struct ForStatment *for_s,
     enum Operation op = invert_cmp(
         get_op_from_child(bba, for_s->cmp, old_continue_list, old_break_list));
     struct Quad *branch_out_q = replace_cc_with_br(bba, &op, bba->len - 1);
-    // in_chain = 0;
-    // if (op >= BRGEU) {
-    //     op -= CMPLEN * 2;
-    // }
-    // // branch
-    // struct Quad q =
-    //     make_quad(make_Location_empty_reg(), op, make_Location_BB(bba->len),
-    //               make_Location_empty_reg());
-    // struct Quad *branch_out_q = append_quad(&CURRENT_BB, q);
-    // append_basic_block(bba, make_bb(NULL));
-    size_t body_bb = bba->len - 1;
     struct JumpList *continue_list = push_jump_list(NULL, NULL);
     struct JumpList *break_list = push_jump_list(NULL, NULL);
+    append_basic_block(bba, make_bb(NULL));
+    size_t body_bb = bba->len - 1;
     parse_ast(bba, for_s->statment, NULL, &continue_list, &break_list);
     append_basic_block(bba, make_bb(NULL));
     size_t continue_point = bba->len - 1;
     update_jump_list(continue_list, continue_point);
     parse_ast(bba, for_s->incrementer, NULL, old_continue_list, old_break_list);
-    parse_ast(bba, for_s->cmp, NULL, old_continue_list, old_break_list);
-    // in_chain = 0;
-    struct Quad q =
-        make_quad(make_Location_empty_reg(), invert_cmp(op),
-                  make_Location_BB(body_bb), make_Location_empty_reg());
-    append_quad(&CURRENT_BB, q);
+    op = get_op_from_child(bba, for_s->cmp, old_continue_list, old_break_list);
+    replace_cc_with_br(bba, &op, body_bb);
     append_basic_block(bba, make_bb(NULL));
     size_t break_point = bba->len - 1;
     branch_out_q->arg1.bbn = break_point;

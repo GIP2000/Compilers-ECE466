@@ -13,8 +13,17 @@ extern FileInfo file_info;
 extern int yylineno;
 extern struct SymbolTable *symbol_table;
 
-struct Type TTUCHAR;
-struct Type TTULONG;
+static struct Type TTINT;
+static struct Type TTUCHAR;
+static struct Type TTULONG;
+static struct Type TTLONG;
+static struct Type TTLONGLONG;
+static struct Type TTUINT;
+static struct Type TTULONGLONG;
+static struct Type TTDOUBLE;
+static struct Type TTFLOAT;
+static struct Type TTLONGDOUBLE;
+
 int initalized = 0;
 int initalized_str = 0;
 
@@ -42,14 +51,6 @@ AstNode *make_AstNode(int type) {
 }
 
 AstNode *make_ConstantType(YYlvalNumLit numlit) {
-    static struct Type TTINT;
-    static struct Type TTLONG;
-    static struct Type TTLONGLONG;
-    static struct Type TTUINT;
-    static struct Type TTULONGLONG;
-    static struct Type TTDOUBLE;
-    static struct Type TTFLOAT;
-    static struct Type TTLONGDOUBLE;
 
     AstNode *ast = make_AstNode(ASTNODE_CONSTANT);
     ast->constant = numlit;
@@ -369,7 +370,7 @@ AstNode *make_binary_op(int op, AstNode *left, AstNode *right) {
                     ast->value_type = left->value_type;
                     return ast;
                 } else {
-                    yyerror("Invalid implicitn pointer converstion");
+                    yyerror("Invalid implict pointer converstion");
                     exit(2);
                 }
             }
@@ -388,12 +389,27 @@ AstNode *make_binary_op(int op, AstNode *left, AstNode *right) {
             ast->value_type = left->value_type;
             return ast;
         }
+        fprintf(stderr, "Invalid '=' operation\n");
+        exit(3);
     }
-    fprintf(stderr, "Unsuportted op = %d", op);
+    fprintf(stderr, "Unsuportted op = %d\n", op);
     exit(1);
 }
 
 AstNode *make_unary_op(int op, AstNode *child) {
+    if (!initalized) {
+        initalized = 1;
+        INITALIZE(TTINT, T_INT, NULL)
+        INITALIZE(TTLONG, T_LONG, &TTINT)
+        INITALIZE(TTLONGLONG, T_LONG, &TTLONG)
+        INITALIZE(TTUINT, T_UNSIGNED, &TTINT)
+        INITALIZE(TTULONG, T_LONG, &TTUINT)
+        INITALIZE(TTULONGLONG, T_LONG, &TTULONG)
+        INITALIZE(TTDOUBLE, T_DOUBLE, NULL)
+        INITALIZE(TTFLOAT, T_FLOAT, NULL)
+        INITALIZE(TTLONGDOUBLE, T_LONG, &TTDOUBLE)
+        INITALIZE(TTUCHAR, T_CHAR, NULL)
+    }
     AstNode *ast = make_AstNode(ASTNODE_UNARYOP);
     struct UnaryOp *uo = &ast->unary_op;
     uo->op = op;
@@ -465,9 +481,7 @@ AstNode *make_unary_op(int op, AstNode *child) {
         }
         break;
     case SIZEOF:
-        // let everything through for now
-        // don't promote array
-        ast->value_type = child->value_type;
+        ast->value_type = &TTINT;
         return ast;
         break;
     default:
