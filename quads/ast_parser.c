@@ -42,7 +42,6 @@ const OpInverter INVERTER = {1, 0, 5, 3, 4, 2};
 extern VReg next_vreg;
 int parse_ast(struct BasicBlockArr *bba, AstNode *ast, struct Location *pass,
               struct JumpList **continue_list, struct JumpList **break_list);
-u64 size_of_abstract(struct Type *t);
 u64 get_struct_size(struct Type *t);
 u64 get_union_size(struct Type *t);
 struct Quad *replace_cc_with_br(struct BasicBlockArr *bba, enum Operation *op,
