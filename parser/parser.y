@@ -800,7 +800,7 @@ direct_declarator: IDENT {
                  } // Optional
                  | direct_declarator '(' {create_scope(PROTOTYPE);} ')' {
                     $1.st = shallow_pop_table();
-                    $1.node.val.type = make_func_type(NULL, NULL, 0);
+                    $1.node.val.type = make_func_type(NULL, $1.st, 0);
                     $1.node.type = FUNCTION;
                     $$ = $1;
                  }
@@ -987,7 +987,7 @@ direct_abstract_declarator: '(' abstract_declarator ')' {$$ = $2;}
                           }// Double Optional
                           | direct_abstract_declarator '(' {create_scope(PROTOTYPE);} ')' {
                             $1.st = shallow_pop_table();
-                            $1.node.val.type = make_func_type(NULL, NULL, 0);
+                            $1.node.val.type = make_func_type(NULL, $1.st, 0);
                             $1.node.type = FUNCTION;
                             $$ = $1;
                           }
@@ -996,7 +996,7 @@ direct_abstract_declarator: '(' abstract_declarator ')' {$$ = $2;}
                               $$.st = shallow_pop_table();
                           }
                           | '('{create_scope(PROTOTYPE);} ')' {
-                             $$ = make_st_node_pair(make_st_node(NULL, ORD, FUNCTION, get_default_sc(), make_func_type(NULL, NULL, 0), NULL));
+                             $$ = make_st_node_pair(make_st_node(NULL, ORD, FUNCTION, get_default_sc(), make_func_type(NULL, symbol_table, 0), NULL));
                              $$.st = shallow_pop_table();
                           }
                           ;

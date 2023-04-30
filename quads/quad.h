@@ -3,21 +3,47 @@
 #include "../parser/symbol_table.h"
 #include <stddef.h>
 
+// Virtual Register counter
 typedef unsigned int VReg;
-#define EMPTY_VREG 0
-#define VREG_START 1
+
 // number of the virtual register to use.
 // the number 0 represents a null register
 // ie there is no arg (b = a++ has one arg only) or eq (*d = 1; would not have
 // an eq since its a STORE type command)
+#define EMPTY_VREG 0
+#define VREG_START 1
+
+// Registers that we can use
+enum Registers {
+    // ------- CONTROL FLOW -------
+    NONE = 0, // not assigned yet
+    SPILL,    // if the register was spilled onto the stack
+    EBP,      // register for bp (refrencing other local variables / parameters)
+    // ------- CONTROL FLOW -------
+
+    // ------- SCRATCH REGISTERS-------
+    EAX, // acc register
+    EDX, // data register
+    ECX, // count register
+    // ------- SCRATCH REGISTERS-------
+
+    // ------- LONG TERM REGISTERS-------
+    EBX, // base register
+    ESI, // string source register
+    EDI, // string dest register
+    // ------- LONG TERM REGISTERS-------
+};
+#define REGISTERCOUNT 6
+#define STARTREG 3
 
 enum LocationType { REG, VAR, CONSTINT, CONSTFLOAT, BASICBLOCKNUM };
 
 struct VRegCounter {
-    size_t cap;
+    i64 cap;
     struct VRegCounterNode {
         size_t count;
-        int real_reg;
+        enum Registers real_reg;
+        i64 spill_offset;
     } *arr;
 };
 

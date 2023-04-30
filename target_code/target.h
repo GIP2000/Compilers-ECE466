@@ -1,4 +1,5 @@
 #pragma once
+
 #include "../parser/symbol_table.h"
 #include "../quads/quad.h"
 

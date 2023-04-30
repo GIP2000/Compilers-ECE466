@@ -142,7 +142,7 @@ u64 size_of_abstract(struct Type *t) {
         return result;
     }
     if (result == 0) {
-        fprintf(stderr, "Invalid argument to sizeof");
+        fprintf(stderr, "Invalid argument to sizeof\n");
         exit(3);
     }
     // is struct, union or array

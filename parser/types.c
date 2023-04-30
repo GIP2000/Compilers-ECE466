@@ -200,6 +200,7 @@ struct Type *make_func_type(struct Type *ret, struct SymbolTable *pt,
     type_obj->extentions.func.has_variable_args = has_variable_args;
     type_obj->extentions.func.statment = NULL;
     type_obj->extentions.func.ret = ret != NULL ? clone_type(ret) : NULL;
+    type_obj->extentions.func.scope = pt;
     if (pt == NULL) {
         type_obj->extentions.func.arg_count = 0;
         type_obj->extentions.func.args = NULL;
@@ -387,7 +388,6 @@ void print_type_i(struct Type *type, int prev_pointer) {
         type->extentions.next_type.arr_size_expression != NULL &&
         type->extentions.next_type.arr_size_expression->type ==
             ASTNODE_CONSTANT) {
-        AstNode *expr = type->extentions.next_type.arr_size_expression;
 
         printf(
             " size: (%lld) ",

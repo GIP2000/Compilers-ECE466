@@ -9,9 +9,9 @@ const size_t INITAL_CAP = 100;
 struct VRegCounter v_reg_counter;
 
 void debug_print_vrc() {
-    size_t i;
+    i64 i;
     for (i = 0; i < v_reg_counter.cap; ++i) {
-        fprintf(stderr, "%%T%zu = %zu\n", i, v_reg_counter.arr[i].count);
+        fprintf(stderr, "%%T%lld = %zu\n", i, v_reg_counter.arr[i].count);
     }
 }
 

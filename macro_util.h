@@ -8,3 +8,7 @@ typedef int i32;
     if ((ptr) != NULL) {                                                       \
         *(ptr) = value;                                                        \
     }
+
+#define MIN(A, B) (A) < (B) ? (A) : (B)
+
+#define MAX(A, B) (A) > (B) ? (A) : (B)

@@ -1,7 +1,7 @@
 all: gip
 .PHONY: clean
 
-FLAGS = -Wall -Wextra
+FLAGS = -Wall -Wextra -g
 
 parser.tab.c parser.tab.h: parser/parser.y
 	bison -v -k -d parser/parser.y
