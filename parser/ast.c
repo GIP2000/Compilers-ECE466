@@ -23,9 +23,9 @@ static struct Type TTULONGLONG;
 static struct Type TTDOUBLE;
 static struct Type TTFLOAT;
 static struct Type TTLONGDOUBLE;
+static struct Type TTSTR;
 
 int initalized = 0;
-int initalized_str = 0;
 
 #define INITALIZE(init, type_name, next_type_val)                              \
     (init).qualifier_bit_mask = 0;                                             \
@@ -50,11 +50,7 @@ AstNode *make_AstNode(int type) {
     return node;
 }
 
-AstNode *make_ConstantType(YYlvalNumLit numlit) {
-
-    AstNode *ast = make_AstNode(ASTNODE_CONSTANT);
-    ast->constant = numlit;
-
+void init_statics() {
     if (!initalized) {
         initalized = 1;
         INITALIZE(TTINT, T_INT, NULL)
@@ -67,7 +63,16 @@ AstNode *make_ConstantType(YYlvalNumLit numlit) {
         INITALIZE(TTFLOAT, T_FLOAT, NULL)
         INITALIZE(TTLONGDOUBLE, T_LONG, &TTDOUBLE)
         INITALIZE(TTUCHAR, T_CHAR, NULL)
+        INITALIZE(TTSTR, T_POINTER, &TTUCHAR)
     }
+}
+
+AstNode *make_ConstantType(YYlvalNumLit numlit) {
+
+    AstNode *ast = make_AstNode(ASTNODE_CONSTANT);
+    ast->constant = numlit;
+
+    init_statics();
 
     switch (numlit.type) {
     case TINT:
@@ -108,10 +113,7 @@ AstNode *make_ConstantType(YYlvalNumLit numlit) {
 }
 
 AstNode *make_StringType(YYlvalStrLit strlit) {
-    static struct Type TTSTR;
-    if (initalized_str) {
-        INITALIZE(TTSTR, T_POINTER, &TTUCHAR)
-    }
+    init_statics();
     AstNode *ast = make_AstNode(ASTNODE_STRLIT);
     ast->strlit = strlit;
     ast->value_type = &TTSTR;
@@ -397,19 +399,7 @@ AstNode *make_binary_op(int op, AstNode *left, AstNode *right) {
 }
 
 AstNode *make_unary_op(int op, AstNode *child) {
-    if (!initalized) {
-        initalized = 1;
-        INITALIZE(TTINT, T_INT, NULL)
-        INITALIZE(TTLONG, T_LONG, &TTINT)
-        INITALIZE(TTLONGLONG, T_LONG, &TTLONG)
-        INITALIZE(TTUINT, T_UNSIGNED, &TTINT)
-        INITALIZE(TTULONG, T_LONG, &TTUINT)
-        INITALIZE(TTULONGLONG, T_LONG, &TTULONG)
-        INITALIZE(TTDOUBLE, T_DOUBLE, NULL)
-        INITALIZE(TTFLOAT, T_FLOAT, NULL)
-        INITALIZE(TTLONGDOUBLE, T_LONG, &TTDOUBLE)
-        INITALIZE(TTUCHAR, T_CHAR, NULL)
-    }
+    init_statics();
     AstNode *ast = make_AstNode(ASTNODE_UNARYOP);
     struct UnaryOp *uo = &ast->unary_op;
     uo->op = op;

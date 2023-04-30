@@ -142,6 +142,7 @@ int enter_in_namespace(struct SymbolTableNode node, enum Namespace namespc) {
         symbol_table->capacity = symbol_table->len + 10;
     }
 
+    node.symbol_loc = symbol_table->st_type;
     *n = node;
     symbol_table->nodearr[symbol_table->len++] = n;
 
@@ -215,6 +216,7 @@ struct SymbolTableNode make_st_node(char *name, enum Namespace namespc,
                                     struct Type *type,
                                     struct AstNode *initalizer) {
     struct SymbolTableNode n;
+    n.symbol_loc = 0;
     n.name = name;
     n.offset = 0;
     n.offset_marked = 0;

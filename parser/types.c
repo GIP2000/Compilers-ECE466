@@ -1,5 +1,6 @@
 #include "./types.h"
 #include "./symbol_table.h"
+#include "ast.h"
 #include <stdio.h>
 #include <string.h>
 
@@ -7,7 +8,7 @@ extern void yyerror(char *);
 
 const SIZEOF_TABLE TYPE_SIZE_TABLE = //{0, 0, 2,  4, 1, 4,  8,  8, 0,
                                      // 0, 8, -1, 0, 0, -1, -1, 4};
-    {0, 0, 1, 2, 4, 4, 8, 8, 0, 0, 8, -1, 0, 0, -1, -1, 4};
+    {0, 0, 1, 2, 4, 4, 8, 4, 0, 0, 8, -1, 0, 0, -1, -1, 4};
 
 int types_eq(struct Type *t1, struct Type *t2) {
     if (t1->type != t2->type) {
@@ -380,6 +381,17 @@ void print_type_i(struct Type *type, int prev_pointer) {
 
     if (type->type < T_POINTER) {
         return;
+    }
+
+    if (type->type == T_ARR &&
+        type->extentions.next_type.arr_size_expression != NULL &&
+        type->extentions.next_type.arr_size_expression->type ==
+            ASTNODE_CONSTANT) {
+        AstNode *expr = type->extentions.next_type.arr_size_expression;
+
+        printf(
+            " size: (%lld) ",
+            type->extentions.next_type.arr_size_expression->constant.val.u_int);
     }
 
     if (type->type < T_TYPEDEF) {

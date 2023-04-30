@@ -175,3 +175,4 @@ AstNode *make_Typename(struct Type *type_name);
 
 AstNode *make_ConstantType(YYlvalNumLit constant);
 AstNode *make_StringType(YYlvalStrLit constant);
+int types_are_eq(struct Type *left, struct Type *right);

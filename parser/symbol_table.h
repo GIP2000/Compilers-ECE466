@@ -58,6 +58,7 @@ struct SymbolTableNode {
     struct DebugFileInfo fi;
     int offset_marked;
     unsigned long long offset;
+    enum SymbolTableType symbol_loc;
     struct {
         // enum StorageClass sc;
         struct EffectiveStorageClass sc;
