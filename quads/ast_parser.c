@@ -200,6 +200,8 @@ struct Location get_loc_pos_is_val(AstNode *node) {
         else
             result = make_Location_int((i64)node->constant.val.chr);
 
+    } else if (node->type == ASTNODE_STRLIT) {
+        result = make_Location_str(node->strlit);
     } else {
         result = make_Location_var(node->ident);
     }
@@ -1070,7 +1072,7 @@ int parse_ast(struct BasicBlockArr *bba, AstNode *ast, struct Location *eq,
     case ASTNODE_CONSTANT:
         return 1;
     case ASTNODE_STRLIT:
-        break;
+        return 1;
     case ASTNODE_IDENT:
         return 1;
     case ASTNODE_UNARYOP:

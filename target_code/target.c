@@ -78,6 +78,14 @@ void two_reg_print(FILE *fout, char *op, struct RealLocation arg1,
     fprintf(fout, "\n");
 }
 
+char *get_str() {
+    static size_t str_counter = 0;
+    int length = str_counter == 0 ? 1 : log10(str_counter) + 1;
+    char *name = (char *)malloc(sizeof(char) * (6 + length));
+    sprintf(name, "$.LOS%zu", str_counter++);
+    return name;
+}
+
 enum Registers pick_register(VReg v_reg) {
     if (v_reg_counter.arr[v_reg].real_reg != NONE) {
         enum Registers live_reg = v_reg_counter.arr[v_reg].real_reg;
@@ -138,6 +146,11 @@ struct RealLocation convert_to_real(struct Location l) {
         sprintf(rl.tag.tag_name, ".BB%zu", l.bbn);
         break;
     }
+    case CONSTSTR:
+        rl.type = TAGNAME;
+        rl.tag.tag_name = get_str();
+        rl.tag.is_owned = 1;
+        break;
     }
 
     return rl;
@@ -257,12 +270,38 @@ void initalize_function_and_locals(FILE *fout, char *name,
 
 u64 get_alignment(struct Type *t);
 
+void initalize_local_strs(FILE *fout, struct BasicBlockArr *bba) {
+    size_t i;
+    size_t str_counter = 0;
+    int first = 1;
+    for (i = 0; i < bba->len; ++i) {
+        struct QuadListNode *current;
+        for (current = bba->arr[i].head; current != NULL;
+             current = current->next) {
+            struct Quad q = current->quad;
+            if (q.arg1.loc_type == CONSTSTR) {
+                if (first)
+                    fprintft(fout, ".section rodata\n");
+                fprintf(fout, ".LOS%zu:\n", str_counter++);
+                fprintft(fout, ".string\t\"%s\"\n", q.arg1.strlit.original_str);
+            }
+            if (q.arg2.loc_type == CONSTSTR) {
+                if (first)
+                    fprintft(fout, ".section rodata\n");
+                fprintf(fout, ".LOS%zu:\n", str_counter++);
+                fprintft(fout, ".string\t\"%s\"\n", q.arg2.strlit.original_str);
+            }
+        }
+    }
+}
+
 void output_asm(char *output_file_name, struct BasicBlockArr *bba,
                 struct SymbolTable *global_table) {
 
     FILE *fout = fopen(output_file_name, "w");
 
     initalize_data_and_bss_sections(fout, global_table);
+    initalize_local_strs(fout, bba);
     fprintft(fout, ".text\n");
     size_t i;
     struct SymbolTableNode *last_ref = NULL;

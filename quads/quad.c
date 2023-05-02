@@ -89,6 +89,13 @@ struct Location make_Location_var(struct SymbolTableNode *v) {
     l.deref = 0;
     return l;
 }
+struct Location make_Location_str(YYlvalStrLit strlit) {
+    struct Location l;
+    l.loc_type = CONSTSTR;
+    l.strlit = strlit;
+    l.deref = 0;
+    return l;
+}
 
 struct BasicBlockArr initalize_BasicBlockArr(size_t inital_cap) {
     struct BasicBlockArr bba;
@@ -152,6 +159,8 @@ void print_location(struct Location *loc) {
         printf("[");
     if (loc->loc_type == VAR)
         printf("%s", loc->var->name);
+    else if (loc->loc_type == CONSTSTR)
+        printf("\"%s\"", loc->strlit.original_str);
     else if (loc->loc_type == CONSTINT)
         printf("%lld", loc->const_int);
     else if (loc->loc_type == CONSTFLOAT)

@@ -30,9 +30,9 @@ YYSTYPE convert_to_str(char *character, int len) {
     char pre_str[t_len];
     char post_str[t_len];
     strncpy(pre_str, character + prefix_count + 1, t_len);
-    char *old_str = (char *)malloc(sizeof(char) * t_len + 1);
+    char *old_str = (char *)malloc(sizeof(char) * t_len);
     strncpy(old_str, pre_str, t_len);
-    old_str[t_len] = 0;
+    old_str[t_len - 1] = 0;
     pre_str[t_len - 1] = 0;
     // gets the true str length
     // and parsing the str properly

@@ -36,7 +36,7 @@ enum Registers {
 #define REGISTERCOUNT 6
 #define STARTREG 3
 
-enum LocationType { REG, VAR, CONSTINT, CONSTFLOAT, BASICBLOCKNUM };
+enum LocationType { REG, VAR, CONSTINT, CONSTFLOAT, CONSTSTR, BASICBLOCKNUM };
 
 struct VRegCounter {
     i64 cap;
@@ -56,6 +56,7 @@ struct Location {
         long double const_float;
         long long const_int;
         size_t bbn;
+        YYlvalStrLit strlit;
     };
 };
 
@@ -176,6 +177,7 @@ struct Location make_Location_reg();
 struct Location make_Location_empty_reg();
 struct Location make_Location_var(struct SymbolTableNode *v);
 struct Location make_Location_BB(size_t bbn);
+struct Location make_Location_str(YYlvalStrLit strlit);
 
 struct BasicBlockArr initalize_BasicBlockArr(size_t cap);
 void append_basic_block(struct BasicBlockArr *bba, struct BasicBlock bb);
