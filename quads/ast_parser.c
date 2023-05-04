@@ -6,10 +6,23 @@
 
 #define CURRENT_BB bba->arr[bba->len - 1]
 
+extern struct VRegCounter v_reg_counter;
+
 struct JumpList {
     struct Quad *q_to_update;
     struct JumpList *next;
 };
+
+void dec_counter_on_delete_l(struct Location l) {
+    if (l.loc_type == REG && l.reg != EMPTY_VREG) {
+        v_reg_counter.arr[l.reg].count--;
+    }
+}
+void dec_counter_on_delete(struct Quad q) {
+    dec_counter_on_delete_l(q.eq);
+    dec_counter_on_delete_l(q.arg1);
+    dec_counter_on_delete_l(q.arg2);
+}
 
 struct JumpList *push_jump_list(struct JumpList *head, struct Quad *quad) {
 
@@ -69,6 +82,7 @@ u64 get_union_size(struct Type *t) {
             current_type = current_type->extentions.next_type.next;
         }
         u64 current_alignment = size_of_abstract(current_type);
+        current_alignment = MAX(current_alignment, 4);
         max_size = current > max_size ? current : max_size;
         max_alignment = current_alignment > max_alignment ? current_alignment
                                                           : max_alignment;
@@ -97,6 +111,7 @@ u64 get_struct_size(struct Type *t) {
             current_type = current_type->extentions.next_type.next;
         }
         u64 this_alignment = size_of_abstract(current_type);
+        this_alignment = MAX(4, this_alignment);
         u64 padding =
             (size + current_size) % this_alignment == 0
                 ? 0
@@ -265,6 +280,7 @@ void parse_unary_op(struct BasicBlockArr *bba, struct UnaryOp *uop,
             get_loc_from_parse_ast(is_val, uop->child, bba, &last_quad);
         if (last_quad.op == LOAD) {
             struct Quad q = make_quad(eq_r, MOV, last_quad.arg1, arg2);
+            dec_counter_on_delete(CURRENT_BB.tail->quad);
             CURRENT_BB.tail->quad = q;
             return;
         }
@@ -724,9 +740,12 @@ void parse_binary_op(struct BasicBlockArr *bba, struct BinaryOp *bop,
             make_quad(mem_addr, ADD, s_addr, make_Location_int(offset));
         append_quad(&CURRENT_BB, add_q);
         // LOAD
-        struct Quad q =
-            make_quad(eq_r, LOAD, mem_addr, make_Location_empty_reg());
-        append_quad(&CURRENT_BB, q);
+        if (bop->right->value_type->type != T_POINTER &&
+            bop->right->value_type->type != T_ARR) {
+            struct Quad q =
+                make_quad(eq_r, LOAD, mem_addr, make_Location_empty_reg());
+            append_quad(&CURRENT_BB, q);
+        }
         return;
     }
     case INDSEL: {
@@ -855,6 +874,7 @@ struct Quad *replace_cc_with_br(struct BasicBlockArr *bba, enum Operation *op,
         *op -= CMPLEN * 2;
         q.op = *op;
         if (CURRENT_BB.tail->quad.eq.loc_type != VAR) {
+            dec_counter_on_delete(CURRENT_BB.tail->quad);
             CURRENT_BB.tail->quad = q;
             first_branch = &CURRENT_BB.tail->quad;
             return first_branch;

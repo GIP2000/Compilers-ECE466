@@ -125,6 +125,8 @@ struct BasicBlock make_bb(struct SymbolTableNode *ref) {
     bb.ref = ref;
     bb.head = NULL;
     bb.tail = NULL;
+    bb.last_v_reg_used = next_vreg - 1;
+    bb.first_v_reg_used = next_vreg - 1;
     return bb;
 }
 
@@ -150,7 +152,7 @@ struct Quad *append_quad(struct BasicBlock *bb, struct Quad quad) {
     }
     bb->tail = qn;
     increment_quad_locs(quad);
-
+    bb->last_v_reg_used = next_vreg - 1;
     return &bb->tail->quad;
 }
 

@@ -162,6 +162,8 @@ struct BasicBlock {
     struct QuadListNode *head;
     struct QuadListNode *tail;
     struct SymbolTableNode *ref;
+    VReg last_v_reg_used;
+    VReg first_v_reg_used;
 };
 
 struct BasicBlockArr {
