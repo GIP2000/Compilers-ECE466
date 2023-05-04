@@ -119,7 +119,7 @@ enum Operation {
     CCGEU,  // 5 11
 
     //
-    LOGNOT,
+    // LOGNOT, REMOVED because it doesn't make sense
     // function stuff
     ARGBEGIN,
     ARG,

@@ -221,9 +221,6 @@ void print_op(enum Operation op) {
         break;
 
     // LOGICAL
-    case LOGNOT:
-        printf("LOGNOT");
-        break;
     case MOD:
         printf("MOD");
         break;

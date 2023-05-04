@@ -10,7 +10,7 @@ int main() {
 
     int i;
     for (i = 0; i < 3; ++i) {
-        x.c[i] = 100;
+        x.c[i] = 100 * (i + 1);
     }
     printf("%d %d %d\n", x.c[0], x.c[1], x.c[2]);
 }

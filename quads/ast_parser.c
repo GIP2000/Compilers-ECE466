@@ -24,6 +24,7 @@ void dec_counter_on_delete(struct Quad q) {
     dec_counter_on_delete_l(q.arg2);
 }
 
+enum Operation invert_cmp(enum Operation op);
 struct JumpList *push_jump_list(struct JumpList *head, struct Quad *quad) {
 
     struct JumpList *new_head =
@@ -332,10 +333,18 @@ void parse_unary_op(struct BasicBlockArr *bba, struct UnaryOp *uop,
     case '!': {
         int is_val =
             parse_ast(bba, uop->child, NULL, continue_list, break_list);
+        struct Quad last_q;
         struct Location arg1 =
-            get_loc_from_parse_ast(is_val, uop->child, bba, NULL);
-        struct Quad q = make_quad(eq_r, LOGNOT, arg1, arg2);
-
+            get_loc_from_parse_ast(is_val, uop->child, bba, &last_q);
+        if (last_q.op >= BREQ && last_q.op <= CCGEU) {
+            CURRENT_BB.tail->quad.op = invert_cmp(last_q.op);
+            return;
+        }
+        struct Location l = make_Location_reg();
+        struct Quad q = make_quad(l, CMP, arg1, make_Location_int(0));
+        append_quad(&CURRENT_BB, q);
+        q = make_quad(eq_r, CCEQ, make_Location_empty_reg(),
+                      make_Location_empty_reg());
         append_quad(&CURRENT_BB, q);
         return;
     }
