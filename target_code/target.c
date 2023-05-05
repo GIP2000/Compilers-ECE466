@@ -965,20 +965,30 @@ void output_quad(FILE *fout, struct Quad *q) {
             print_real_loc(fout, arg_arr[i]);
             fprintf(fout, "\n");
         }
-
+        for (i = 0; i < REGISTERCOUNT; ++i) {
+            if (reg_live_map[i]) {
+                fprintf(stderr,
+                        "SHOULDN'T HAPPEN live reg before function call\n");
+                exit(1);
+            }
+        }
         fprintft(fout, "call\t");
         struct RealLocation rl = convert_to_real(q->arg1);
         print_real_loc(fout, rl);
         fprintf(fout, "\n");
         fprintft(fout, "addl\t$%lld, %%esp\n", last_arg_size);
-
+        two_reg_print(fout, "movl", get_register(EAX), convert_to_real(q->eq));
         arg_arr_size = 0;
         free(arg_arr);
         arg_arr = NULL;
+        kill_reg(EAX);
+
         break;
     }
     case RET:
-        // TODO make sure return value is in eax
+        two_reg_print(fout, "movl", convert_to_real(q->arg1),
+                      get_register(EAX));
+        kill_reg(EAX);
         fprintft(fout, "leave\n");
         fprintft(fout, "ret\n");
         break;
