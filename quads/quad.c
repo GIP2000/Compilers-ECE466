@@ -157,7 +157,8 @@ struct Quad *append_quad(struct BasicBlock *bb, struct Quad quad) {
 }
 
 void print_location(struct Location *loc) {
-    if (loc->deref)
+    int i;
+    for (i = loc->deref; i > 0; --i)
         printf("[");
     if (loc->loc_type == VAR)
         printf("%s", loc->var->name);
@@ -171,7 +172,7 @@ void print_location(struct Location *loc) {
         printf("BB%zu", loc->bbn);
     } else if (loc->reg != EMPTY_VREG)
         printf("%%T%04d", loc->reg);
-    if (loc->deref)
+    for (i = loc->deref; i > 0; --i)
         printf("]");
 }
 

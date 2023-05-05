@@ -292,9 +292,14 @@ void parse_unary_op(struct BasicBlockArr *bba, struct UnaryOp *uop,
     case '*': {
         if (uop->child->value_type->type != T_POINTER) {
             fprintf(stderr, "Can't Deref a non pointer type");
+            exit(3);
         }
         int is_val =
             parse_ast(bba, uop->child, NULL, continue_list, break_list);
+        if (uop->child->value_type->extentions.next_type.next->type == T_ARR) {
+            // stops me from loading an array that doesn't exist
+            return;
+        }
         struct Location arg1 =
             get_loc_from_parse_ast(is_val, uop->child, bba, NULL);
         struct Quad q = make_quad(eq_r, LOAD, arg1, arg2);
@@ -379,8 +384,9 @@ void parse_unary_op(struct BasicBlockArr *bba, struct UnaryOp *uop,
         if (uop->child->type == ASTNODE_IDENT) {
             origin = make_Location_var(uop->child->ident);
         } else {
-            origin = last_quad.arg1;
-            origin.deref = 1;
+            origin = last_quad.arg1; // maybe delete
+            // origin.deref = 1;
+            ++origin.deref;
         }
         struct Quad q = make_quad(origin, ADD, arg1, one_const);
         append_quad(&CURRENT_BB, q);
@@ -420,7 +426,8 @@ void parse_unary_op(struct BasicBlockArr *bba, struct UnaryOp *uop,
         // do the add
         struct Location origin = make_Location_var(uop->child->ident);
         if (uop->child->type != ASTNODE_IDENT) {
-            origin.deref = 1;
+            // origin.deref = 1;
+            ++origin.deref;
         }
         struct Quad q = make_quad(origin, SUB, arg1, one_const);
         append_quad(&CURRENT_BB, q);
@@ -467,7 +474,8 @@ void do_assignment_math(struct BasicBlockArr *bba, struct BinaryOp *bop,
         struct Location arg1 = arg1_val;
         if (!is_val) {
             arg1 = last_quad.arg1;
-            arg1.deref = 1;
+            ++arg1.deref;
+            // arg1.deref = 1;
         }
         struct Quad q = make_quad(arg1, op, arg2, arg1_val);
         append_quad(&CURRENT_BB, q);
@@ -677,8 +685,26 @@ void parse_binary_op(struct BasicBlockArr *bba, struct BinaryOp *bop,
         return do_normal_math(bba, bop, &eq_r, BISHR, continue_list,
                               break_list);
     case PLUSEQ:
+        if (bop->left->value_type->type == T_POINTER) {
+            bop->right->constant.val.u_int *= size_of_abstract(
+                bop->left->value_type->extentions.next_type.next);
+        } else if (bop->right->value_type->type == T_POINTER) {
+            bop->left->constant.val.u_int *= size_of_abstract(
+                bop->right->value_type->extentions.next_type.next);
+        }
         return do_assignment_math(bba, bop, ADD, continue_list, break_list);
     case MINUSEQ:
+        if (bop->left->value_type->type == T_POINTER &&
+            bop->right->value_type->type == T_POINTER) {
+            return do_assignment_math(bba, bop, SUB, continue_list, break_list);
+        }
+        if (bop->left->value_type->type == T_POINTER) {
+            bop->right->constant.val.u_int *= size_of_abstract(
+                bop->left->value_type->extentions.next_type.next);
+        } else if (bop->right->value_type->type == T_POINTER) {
+            bop->left->constant.val.u_int *= size_of_abstract(
+                bop->right->value_type->extentions.next_type.next);
+        }
         return do_assignment_math(bba, bop, SUB, continue_list, break_list);
     case TIMESEQ:
         return do_assignment_math(bba, bop, MUL, continue_list, break_list);
@@ -712,7 +738,8 @@ void parse_binary_op(struct BasicBlockArr *bba, struct BinaryOp *bop,
                 get_loc_from_parse_ast(is_val_2, bop->right, bba, NULL);
             if (!is_val) {
                 arg1 = last_quad.arg1;
-                arg1.deref = 1;
+                // arg1.deref = 1;
+                ++arg1.deref;
             }
             struct Quad q =
                 make_quad(arg1, MOV, arg2, make_Location_empty_reg());

@@ -27,6 +27,7 @@ struct RealLocation {
         enum Registers reg;
         u64 constant;
     };
+    int deref_overflow;
     int is_deref;
     int scale;
     i64 disp;
@@ -57,6 +58,7 @@ struct RealLocation get_register(enum Registers reg) {
     struct RealLocation rl;
     rl.type = REGISTER;
     rl.is_deref = 0;
+    rl.deref_overflow = 0;
     rl.reg = reg;
     rl.scale = 1;
 
@@ -106,6 +108,7 @@ struct RealLocation get_available_scratch() {
             rl.type = REGISTER;
             rl.is_deref = 0;
             rl.reg = i + STARTREG;
+            rl.deref_overflow = 0;
             rl.scale = 1;
             rl.disp = 0;
             rl.index_is_reg = 0;
@@ -158,7 +161,9 @@ char *get_str() {
 
 struct RealLocation convert_to_real(struct Location l) {
     struct RealLocation rl;
-    rl.is_deref = l.deref;
+    rl.is_deref = l.deref != 0;
+    rl.deref_overflow = l.deref > 1;
+    rl.deref_overflow = 0;
     rl.scale = 1;
     rl.disp = 0;
     rl.index_constant = 0;
@@ -173,6 +178,9 @@ struct RealLocation convert_to_real(struct Location l) {
         rl.type = REGISTER;
         rl.reg = pick_register(l.reg, &is_spill);
         if (is_spill) {
+            if (rl.is_deref) {
+                rl.deref_overflow = 1;
+            }
             rl.is_deref = 1;
             rl.disp = v_reg_counter.arr[l.reg].spill_offset;
         } else {
@@ -191,6 +199,9 @@ struct RealLocation convert_to_real(struct Location l) {
             rl.type = REGISTER;
             rl.reg = EBP;
             rl.disp = l.var->offset;
+            if (rl.is_deref) {
+                rl.deref_overflow = 1;
+            }
             rl.is_deref = 1;
         }
         break;
@@ -497,7 +508,7 @@ void initalize_function_and_locals(FILE *fout, char *name,
 }
 
 int location_eq(struct Location l1, struct Location l2) {
-    if (l1.loc_type != l2.loc_type)
+    if (l1.loc_type != l2.loc_type || l1.deref != l2.deref)
         return 0;
     switch (l1.loc_type) {
     case REG:
@@ -516,6 +527,16 @@ int location_eq(struct Location l1, struct Location l2) {
     return 0;
 }
 
+struct RealLocation do_double_deref(FILE *fout, struct RealLocation rl) {
+    fprintft(fout, "movl\t");
+    struct RealLocation reg = get_available_scratch();
+    print_real_loc(fout, rl);
+    fprintf(fout, ", ");
+    print_real_loc(fout, reg);
+    fprintf(fout, "\n");
+    return reg;
+}
+
 void print_three_in_two(FILE *fout, char *op, struct Quad *q) {
     struct RealLocation rl1;
     struct RealLocation rl2;
@@ -532,17 +553,29 @@ void print_three_in_two(FILE *fout, char *op, struct Quad *q) {
         rl2 = get_available_scratch();
         // print_real_loc(stderr, rl2);
         two_reg_print(fout, "movl", convert_to_real(q->arg2), rl2);
-        two_reg_print(stderr, "movl", convert_to_real(q->arg2), rl2);
+        // two_reg_print(stderr, "movl", convert_to_real(q->arg2), rl2);
         in_else = 1;
     }
     two_reg_print(fout, op, rl1, rl2);
-    two_reg_print(stderr, op, rl1, rl2);
     if (in_else) {
-        two_reg_print(fout, "movl", rl2, convert_to_real(q->eq));
-        two_reg_print(stderr, "movl", rl2, convert_to_real(q->eq));
+        struct RealLocation eq = convert_to_real(q->eq);
+        if (eq.deref_overflow) {
+            fprintf(stderr, "in overflow derref\n");
+            struct RealLocation reg = do_double_deref(fout, eq);
+            int i;
+            for (i = q->eq.deref; i > 1; --i) {
+                struct RealLocation reg_old = reg;
+                reg_old.is_deref = 1;
+                two_reg_print(fout, "movl", reg_old, reg);
+            }
+            reg.is_deref = 1;
+            two_reg_print(fout, "movl", rl2, reg);
+            kill_reg(reg.reg);
+        } else {
+            two_reg_print(fout, "movl", rl2, eq);
+        }
         kill_reg(rl2.reg);
     }
-    // if else then move result
 }
 
 void output_quad(FILE *fout, struct Quad *q) {
@@ -552,6 +585,12 @@ void output_quad(FILE *fout, struct Quad *q) {
     case LOAD: {
         struct RealLocation reg = get_available_scratch();
         two_reg_print(fout, "movl", convert_to_real(q->arg1), reg);
+        int i;
+        for (i = q->arg1.deref; i > 0; --i) {
+            struct RealLocation reg_old = reg;
+            reg_old.is_deref = 1;
+            two_reg_print(fout, "movl", reg_old, reg);
+        }
         reg.is_deref = 1;
         two_reg_print(fout, "movl", reg, convert_to_real(q->eq));
         kill_reg(reg.reg);
@@ -610,9 +649,13 @@ void output_quad(FILE *fout, struct Quad *q) {
     case ADD:
         print_three_in_two(fout, "addl", q);
         break;
-    case SUB:
-        print_three_in_two(fout, "subl", q);
+    case SUB: {
+        struct Quad real_q = *q;
+        real_q.arg1 = q->arg2;
+        real_q.arg2 = q->arg1;
+        print_three_in_two(fout, "subl", &real_q);
         break;
+    }
     case MUL:
         print_three_in_two(fout, "imull", q);
         break;
