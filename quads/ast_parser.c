@@ -83,7 +83,7 @@ u64 get_union_size(struct Type *t) {
             current_type = current_type->extentions.next_type.next;
         }
         u64 current_alignment = size_of_abstract(current_type);
-        current_alignment = MAX(current_alignment, 4);
+        current_alignment = MIN(current_alignment, 4);
         max_size = current > max_size ? current : max_size;
         max_alignment = current_alignment > max_alignment ? current_alignment
                                                           : max_alignment;
@@ -112,7 +112,7 @@ u64 get_struct_size(struct Type *t) {
             current_type = current_type->extentions.next_type.next;
         }
         u64 this_alignment = size_of_abstract(current_type);
-        this_alignment = MAX(4, this_alignment);
+        this_alignment = MIN(4, this_alignment);
         u64 padding =
             (size + current_size) % this_alignment == 0
                 ? 0
@@ -291,8 +291,8 @@ void parse_unary_op(struct BasicBlockArr *bba, struct UnaryOp *uop,
     }
     case '*': {
         if (uop->child->value_type->type != T_POINTER) {
-            fprintf(stderr, "Can't Deref a non pointer type");
             exit(3);
+            fprintf(stderr, "Can't Deref a non pointer type");
         }
         int is_val =
             parse_ast(bba, uop->child, NULL, continue_list, break_list);

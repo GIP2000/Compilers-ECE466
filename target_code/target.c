@@ -627,6 +627,28 @@ void output_quad(FILE *fout, struct Quad *q) {
         }
         break;
     }
+    case CVTFL:
+        fprintf(stderr, "floats not supported\n");
+        break;
+    case CVTFQ:
+        fprintf(stderr, "floats not supported\n");
+        break;
+    case CVTBS:
+        // fallthrough
+    case CVTWS:
+        // fallthrough
+    case CVTLS:
+        // fallthrough
+    case CVTQS:
+        // fallthrough
+    case CVTBU:
+        // fallthrough
+    case CVTWU:
+        // fallthrough
+    case CVTLU:
+        // fallthrough
+    case CVTQU:
+        // fallthrough
     case MOV: {
         if (!q->eq.deref) {
             two_reg_print(fout, "movl", convert_to_real(q->arg1),
@@ -959,26 +981,6 @@ void output_quad(FILE *fout, struct Quad *q) {
         // TODO make sure return value is in eax
         fprintft(fout, "leave\n");
         fprintft(fout, "ret\n");
-        break;
-    case CVTBS:
-        break;
-    case CVTWS:
-        break;
-    case CVTLS:
-        break;
-    case CVTQS:
-        break;
-    case CVTBU:
-        break;
-    case CVTWU:
-        break;
-    case CVTLU:
-        break;
-    case CVTQU:
-        break;
-    case CVTFL:
-        break;
-    case CVTFQ:
         break;
     }
 }
