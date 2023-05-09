@@ -8,9 +8,6 @@
 #include <stdio.h>
 #include <string.h>
 
-#define fprintft(fout, fmt, ...)                                               \
-    fprintf((fout), "\t" fmt __VA_OPT__(, ) __VA_ARGS__)
-
 extern struct VRegCounter v_reg_counter;
 
 struct RealLocation {
@@ -130,20 +127,27 @@ void two_reg_print(FILE *fout, char *op, struct RealLocation arg1,
     int arg2_would_need = arg2.is_deref || arg2.type == TAGNAME;
 
     if (!(arg1_would_need && arg2_would_need)) {
-        fprintft(fout, "%s\t", op);
+        fprintf(fout,
+                "\t"
+                "%s\t",
+                op);
         print_real_loc(fout, arg1);
         fprintf(fout, ", ");
         print_real_loc(fout, arg2);
         fprintf(fout, "\n");
         return;
     }
-    fprintft(fout, "movl\t");
+    fprintf(fout, "\t"
+                  "movl\t");
     print_real_loc(fout, arg1);
     fprintf(fout, ", ");
     struct RealLocation scratch = get_available_scratch();
     print_real_loc(fout, scratch);
     fprintf(fout, "\n");
-    fprintft(fout, "%s\t", op);
+    fprintf(fout,
+            "\t"
+            "%s\t",
+            op);
     print_real_loc(fout, scratch);
     fprintf(fout, ", ");
     print_real_loc(fout, arg2);
@@ -289,6 +293,13 @@ void get_reg_name(enum Registers reg, char *reg_name) {
         reg_name[1] = 'e';
         reg_name[0] = '%';
         break;
+    case ESP:
+        reg_name[4] = 0;
+        reg_name[3] = 'p';
+        reg_name[2] = 's';
+        reg_name[1] = 'e';
+        reg_name[0] = '%';
+        break;
     }
 }
 
@@ -368,15 +379,23 @@ void initalize_local_strs(FILE *fout, struct BasicBlockArr *bba) {
             struct Quad q = current->quad;
             if (q.arg1.loc_type == CONSTSTR) {
                 if (first)
-                    fprintft(fout, ".section .rodata\n");
+                    fprintf(fout, "\t"
+                                  ".section .rodata\n");
                 fprintf(fout, ".LOS%zu:\n", str_counter++);
-                fprintft(fout, ".string\t\"%s\"\n", q.arg1.strlit.original_str);
+                fprintf(fout,
+                        "\t"
+                        ".string\t\"%s\"\n",
+                        q.arg1.strlit.original_str);
             }
             if (q.arg2.loc_type == CONSTSTR) {
                 if (first)
-                    fprintft(fout, ".section .rodata\n");
+                    fprintf(fout, "\t"
+                                  ".section .rodata\n");
                 fprintf(fout, ".LOS%zu:\n", str_counter++);
-                fprintft(fout, ".string\t\"%s\"\n", q.arg2.strlit.original_str);
+                fprintf(fout,
+                        "\t"
+                        ".string\t\"%s\"\n",
+                        q.arg2.strlit.original_str);
             }
         }
     }
@@ -389,7 +408,8 @@ void output_asm(char *output_file_name, struct BasicBlockArr *bba,
 
     initalize_data_and_bss_sections(fout, global_table);
     initalize_local_strs(fout, bba);
-    fprintft(fout, ".text\n");
+    fprintf(fout, "\t"
+                  ".text\n");
     size_t i;
     struct SymbolTableNode *last_ref = NULL;
 
@@ -412,11 +432,19 @@ void initalize_function_and_locals(FILE *fout, char *name,
                                    struct BasicBlockArr *bba,
                                    size_t start_index) {
 
-    fprintft(fout, ".globl\t%s\n", name);
-    fprintft(fout, ".type\t%s, @function\n", name);
+    fprintf(fout,
+            "\t"
+            ".globl\t%s\n",
+            name);
+    fprintf(fout,
+            "\t"
+            ".type\t%s, @function\n",
+            name);
     fprintf(fout, "%s:\n", name);
-    fprintft(fout, "pushl\t%%ebp\n");
-    fprintft(fout, "movl\t%%esp, %%ebp\n");
+    fprintf(fout, "\t"
+                  "pushl\t%%ebp\n");
+    fprintf(fout, "\t"
+                  "movl\t%%esp, %%ebp\n");
     size_t i;
     i64 parameter_size = 8;
     // set offsets for parametrs
@@ -430,7 +458,7 @@ void initalize_function_and_locals(FILE *fout, char *name,
     }
 
     // set offsets for locals + calc stack grow size
-    i64 total_size = 0;
+    i64 total_size = 4;
     for (i = func_type->extentions.func.arg_count;
          i < func_type->extentions.func.scope->len; ++i) {
         if (func_type->extentions.func.scope->nodearr[i]->type == FUNCTION) {
@@ -441,27 +469,40 @@ void initalize_function_and_locals(FILE *fout, char *name,
             func_type->extentions.func.scope->nodearr[i]->val.type);
         u64 aligment = get_alignment(
             func_type->extentions.func.scope->nodearr[i]->val.type);
-        if (total_size + size % aligment != 0) {
+        // fprintf(stderr,
+        //         "total_size = %lld\nvar %s has size %lld with aligment
+        //         %lld\n", total_size,
+        //         func_type->extentions.func.scope->nodearr[i]->name, size,
+        //         aligment);
+        if ((total_size + size) % aligment != 0) {
+            // fprintf(stderr, "in if\n");
             total_size += aligment - size;
         }
         func_type->extentions.func.scope->nodearr[i]->offset =
             -(size + total_size);
+        // fprintf(stderr, "total size = %lld, size = %lld\n", total_size,
+        // size);
         total_size += size;
+        // fprintf(stderr, "total size = %lld, size = %lld\n", total_size,
+        // size);
     }
     // Find VReg Spilling
     VReg last = EMPTY_VREG;
     struct SymbolTableNode *last_ref = NULL;
+    long long max_args = 0;
     for (i = start_index; i < bba->len; ++i) {
         if (bba->arr[i].ref != NULL && last_ref != bba->arr[i].ref) {
             if (i > start_index)
                 break;
         }
-        fprintf(stderr, "spilling i = %zu\n", i);
         last_ref = bba->arr[i].ref;
         struct QuadListNode *current_q;
         for (current_q = bba->arr[i].head; current_q != NULL;
              current_q = current_q->next) {
             struct Quad q = current_q->quad;
+            if (q.op == ARGBEGIN) {
+                max_args = MAX(q.arg1.const_int, max_args);
+            }
             if (q.eq.loc_type == REG &&
                 v_reg_counter.arr[q.eq.reg].real_reg == NONE) {
                 if (total_size % 4 != 0) {
@@ -495,16 +536,20 @@ void initalize_function_and_locals(FILE *fout, char *name,
             }
         }
     }
-    fprintf(stderr, "last = %d\n", last);
-    for (i = 0; i < last; ++i) {
-        fprintf(stderr, "i %zu: is spill = %d\n", i,
-                v_reg_counter.arr[i].real_reg == SPILL);
-    }
+    // fprintf(stderr, "last = %d\n", last);
+    // for (i = 0; i < last; ++i) {
+    // fprintf(stderr, "i %zu: is spill = %d\n", i,
+    //         v_reg_counter.arr[i].real_reg == SPILL);
+    // }
+    total_size += max_args * 4;
     if (total_size % 16 != 0) {
         total_size += 16 - (total_size % 16);
     }
     if (total_size > 0)
-        fprintft(fout, "subl\t$%lld, %%esp\n", total_size);
+        fprintf(fout,
+                "\t"
+                "subl\t$%lld, %%esp\n",
+                total_size);
 }
 
 int location_eq(struct Location l1, struct Location l2) {
@@ -528,7 +573,8 @@ int location_eq(struct Location l1, struct Location l2) {
 }
 
 struct RealLocation do_double_deref(FILE *fout, struct RealLocation rl) {
-    fprintft(fout, "movl\t");
+    fprintf(fout, "\t"
+                  "movl\t");
     struct RealLocation reg = get_available_scratch();
     print_real_loc(fout, rl);
     fprintf(fout, ", ");
@@ -560,7 +606,6 @@ void print_three_in_two(FILE *fout, char *op, struct Quad *q) {
     if (in_else) {
         struct RealLocation eq = convert_to_real(q->eq);
         if (eq.deref_overflow) {
-            fprintf(stderr, "in overflow derref\n");
             struct RealLocation reg = do_double_deref(fout, eq);
             int i;
             for (i = q->eq.deref; i > 1; --i) {
@@ -604,14 +649,16 @@ void output_quad(FILE *fout, struct Quad *q) {
         struct RealLocation rl1 = convert_to_real(q->arg1);
         switch (rl1.type) {
         case TAGNAME:
-            fprintft(fout, "movl\t$");
+            fprintf(fout, "\t"
+                          "movl\t$");
             print_real_loc(fout, rl1);
             fprintf(fout, ", ");
             print_real_loc(fout, convert_to_real(q->eq));
             fprintf(fout, "\n");
             break;
         case REGISTER: {
-            fprintft(fout, "leal\t");
+            fprintf(fout, "\t"
+                          "leal\t");
             print_real_loc(fout, convert_to_real(q->arg1));
             fprintf(fout, ", ");
             struct RealLocation reg = get_available_scratch();
@@ -657,7 +704,8 @@ void output_quad(FILE *fout, struct Quad *q) {
             break;
         }
         struct RealLocation rl = convert_to_real(q->eq);
-        fprintft(fout, "movl\t");
+        fprintf(fout, "\t"
+                      "movl\t");
         print_real_loc(fout, rl);
         fprintf(fout, ", ");
         struct RealLocation reg = get_available_scratch();
@@ -689,7 +737,8 @@ void output_quad(FILE *fout, struct Quad *q) {
             fprintf(stderr, "something is funcky");
         }
         two_reg_print(fout, "movl", convert_to_real(q->arg1), rl);
-        fprintft(fout, "idiv\t");
+        fprintf(fout, "\t"
+                      "idiv\t");
         print_real_loc(fout, convert_to_real(q->arg2));
         rl.reg = EAX;
         if (reg_live_map[EAX - STARTREG] == 1) {
@@ -716,7 +765,8 @@ void output_quad(FILE *fout, struct Quad *q) {
             fprintf(stderr, "something is funcky");
         }
         two_reg_print(fout, "movl", convert_to_real(q->arg1), rl);
-        fprintft(fout, "idiv\t");
+        fprintf(fout, "\t"
+                      "idiv\t");
         print_real_loc(fout, convert_to_real(q->arg2));
         two_reg_print(fout, "movl", rl, convert_to_real(q->eq));
         break;
@@ -761,73 +811,88 @@ void output_quad(FILE *fout, struct Quad *q) {
                       convert_to_real(q->arg1));
         break;
     case BR:
-        fprintft(fout, "jmp\t");
+        fprintf(fout, "\t"
+                      "jmp\t");
         print_real_loc(fout, convert_to_real(q->arg1));
         fprintf(fout, "\n");
         break;
     case BREQ:
-        fprintft(fout, "je\t");
+        fprintf(fout, "\t"
+                      "je\t");
         print_real_loc(fout, convert_to_real(q->arg1));
         fprintf(fout, "\n");
         break;
     case BRNEQ:
-        fprintft(fout, "jne\t");
+        fprintf(fout, "\t"
+                      "jne\t");
         print_real_loc(fout, convert_to_real(q->arg1));
         fprintf(fout, "\n");
         break;
     case BRLT:
-        fprintft(fout, "jl\t");
+        fprintf(fout, "\t"
+                      "jl\t");
         print_real_loc(fout, convert_to_real(q->arg1));
         fprintf(fout, "\n");
         break;
     case BRLE:
-        fprintft(fout, "jle\t");
+        fprintf(fout, "\t"
+                      "jle\t");
         print_real_loc(fout, convert_to_real(q->arg1));
         fprintf(fout, "\n");
         break;
     case BRGT:
-        fprintft(fout, "jg\t");
+        fprintf(fout, "\t"
+                      "jg\t");
         print_real_loc(fout, convert_to_real(q->arg1));
         fprintf(fout, "\n");
         break;
     case BRGE:
-        fprintft(fout, "jge\t");
+        fprintf(fout, "\t"
+                      "jge\t");
         print_real_loc(fout, convert_to_real(q->arg1));
         fprintf(fout, "\n");
         break;
     case BREQU:
-        fprintft(fout, "je\t");
+        fprintf(fout, "\t"
+                      "je\t");
         print_real_loc(fout, convert_to_real(q->arg1));
         fprintf(fout, "\n");
         break;
     case BRNEQU:
-        fprintft(fout, "jne\t");
+        fprintf(fout, "\t"
+                      "jne\t");
         print_real_loc(fout, convert_to_real(q->arg1));
         fprintf(fout, "\n");
         break;
     case BRLTU:
-        fprintft(fout, "jb\t");
+        fprintf(fout, "\t"
+                      "jb\t");
         print_real_loc(fout, convert_to_real(q->arg1));
         fprintf(fout, "\n");
         break;
     case BRLEU:
-        fprintft(fout, "jbe\t");
+        fprintf(fout, "\t"
+                      "jbe\t");
         print_real_loc(fout, convert_to_real(q->arg1));
         fprintf(fout, "\n");
         break;
     case BRGTU:
-        fprintft(fout, "ja\t");
+        fprintf(fout, "\t"
+                      "ja\t");
         print_real_loc(fout, convert_to_real(q->arg1));
         fprintf(fout, "\n");
         break;
     case BRGEU:
-        fprintft(fout, "jae\t");
+        fprintf(fout, "\t"
+                      "jae\t");
         print_real_loc(fout, convert_to_real(q->arg1));
         fprintf(fout, "\n");
         break;
     case CCEQ: {
-        fprintft(fout, "sete\t%%al\n");
-        fprintft(fout, "movzbl\t%%al, ");
+        fprintf(fout, "\t"
+                      "sete\t%%al\n");
+        fprintf(fout, "\t"
+                      "movzbl\t%%al, ");
         struct RealLocation reg = get_available_scratch();
         print_real_loc(fout, reg);
         fprintf(fout, "\n");
@@ -836,8 +901,10 @@ void output_quad(FILE *fout, struct Quad *q) {
         break;
     }
     case CCNEQ: {
-        fprintft(fout, "setne\t%%al\n");
-        fprintft(fout, "movzbl\t%%al, ");
+        fprintf(fout, "\t"
+                      "setne\t%%al\n");
+        fprintf(fout, "\t"
+                      "movzbl\t%%al, ");
         struct RealLocation reg = get_available_scratch();
         print_real_loc(fout, reg);
         fprintf(fout, "\n");
@@ -846,8 +913,10 @@ void output_quad(FILE *fout, struct Quad *q) {
         break;
     }
     case CCLT: {
-        fprintft(fout, "setjl\t%%al\n");
-        fprintft(fout, "movzbl\t%%al, ");
+        fprintf(fout, "\t"
+                      "setjl\t%%al\n");
+        fprintf(fout, "\t"
+                      "movzbl\t%%al, ");
         struct RealLocation reg = get_available_scratch();
         print_real_loc(fout, reg);
         fprintf(fout, "\n");
@@ -856,8 +925,10 @@ void output_quad(FILE *fout, struct Quad *q) {
         break;
     }
     case CCLE: {
-        fprintft(fout, "setjle\t%%al\n");
-        fprintft(fout, "movzbl\t%%al, ");
+        fprintf(fout, "\t"
+                      "setjle\t%%al\n");
+        fprintf(fout, "\t"
+                      "movzbl\t%%al, ");
         struct RealLocation reg = get_available_scratch();
         print_real_loc(fout, reg);
         fprintf(fout, "\n");
@@ -866,8 +937,10 @@ void output_quad(FILE *fout, struct Quad *q) {
         break;
     }
     case CCGT: {
-        fprintft(fout, "setjg\t%%al\n");
-        fprintft(fout, "movzbl\t%%al, ");
+        fprintf(fout, "\t"
+                      "setjg\t%%al\n");
+        fprintf(fout, "\t"
+                      "movzbl\t%%al, ");
         struct RealLocation reg = get_available_scratch();
         print_real_loc(fout, reg);
         fprintf(fout, "\n");
@@ -876,8 +949,10 @@ void output_quad(FILE *fout, struct Quad *q) {
         break;
     }
     case CCGE: {
-        fprintft(fout, "setjge\t%%al\n");
-        fprintft(fout, "movzbl\t%%al, ");
+        fprintf(fout, "\t"
+                      "setjge\t%%al\n");
+        fprintf(fout, "\t"
+                      "movzbl\t%%al, ");
         struct RealLocation reg = get_available_scratch();
         print_real_loc(fout, reg);
         fprintf(fout, "\n");
@@ -886,8 +961,10 @@ void output_quad(FILE *fout, struct Quad *q) {
         break;
     }
     case CCEQU: {
-        fprintft(fout, "sete\t%%al\n");
-        fprintft(fout, "movzbl\t%%al, ");
+        fprintf(fout, "\t"
+                      "sete\t%%al\n");
+        fprintf(fout, "\t"
+                      "movzbl\t%%al, ");
         struct RealLocation reg = get_available_scratch();
         print_real_loc(fout, reg);
         fprintf(fout, "\n");
@@ -896,8 +973,10 @@ void output_quad(FILE *fout, struct Quad *q) {
         break;
     }
     case CCNEQU: {
-        fprintft(fout, "setne\t%%al\n");
-        fprintft(fout, "movzbl\t%%al, ");
+        fprintf(fout, "\t"
+                      "setne\t%%al\n");
+        fprintf(fout, "\t"
+                      "movzbl\t%%al, ");
         struct RealLocation reg = get_available_scratch();
         print_real_loc(fout, reg);
         fprintf(fout, "\n");
@@ -906,8 +985,10 @@ void output_quad(FILE *fout, struct Quad *q) {
         break;
     }
     case CCLTU: {
-        fprintft(fout, "setjb\t%%al\n");
-        fprintft(fout, "movzbl\t%%al, ");
+        fprintf(fout, "\t"
+                      "setjb\t%%al\n");
+        fprintf(fout, "\t"
+                      "movzbl\t%%al, ");
         struct RealLocation reg = get_available_scratch();
         print_real_loc(fout, reg);
         fprintf(fout, "\n");
@@ -916,8 +997,10 @@ void output_quad(FILE *fout, struct Quad *q) {
         break;
     }
     case CCLEU: {
-        fprintft(fout, "setjbe\t%%al\n");
-        fprintft(fout, "movzbl\t%%al, ");
+        fprintf(fout, "\t"
+                      "setjbe\t%%al\n");
+        fprintf(fout, "\t"
+                      "movzbl\t%%al, ");
         struct RealLocation reg = get_available_scratch();
         print_real_loc(fout, reg);
         fprintf(fout, "\n");
@@ -926,8 +1009,10 @@ void output_quad(FILE *fout, struct Quad *q) {
         break;
     }
     case CCGTU: {
-        fprintft(fout, "setja\t%%al\n");
-        fprintft(fout, "movzbl\t%%al, ");
+        fprintf(fout, "\t"
+                      "setja\t%%al\n");
+        fprintf(fout, "\t"
+                      "movzbl\t%%al, ");
         struct RealLocation reg = get_available_scratch();
         print_real_loc(fout, reg);
         fprintf(fout, "\n");
@@ -936,8 +1021,10 @@ void output_quad(FILE *fout, struct Quad *q) {
         break;
     }
     case CCGEU: {
-        fprintft(fout, "setjae\t%%al\n");
-        fprintft(fout, "movzbl\t%%al, ");
+        fprintf(fout, "\t"
+                      "setjae\t%%al\n");
+        fprintf(fout, "\t"
+                      "movzbl\t%%al, ");
         struct RealLocation reg = get_available_scratch();
         print_real_loc(fout, reg);
         fprintf(fout, "\n");
@@ -946,51 +1033,60 @@ void output_quad(FILE *fout, struct Quad *q) {
         break;
     }
     case ARGBEGIN: {
-        last_arg_size = 0;
         arg_arr_size = q->arg1.const_int;
-        arg_arr = (struct RealLocation *)malloc(sizeof(struct RealLocation) *
-                                                q->arg1.const_int);
         break;
     }
     case ARG: {
-        last_arg_size += 4;
-        arg_arr[q->arg1.const_int] = convert_to_real(q->arg2);
+        struct RealLocation esp;
+        esp.type = REGISTER;
+        esp.is_deref = 1;
+        esp.reg = ESP;
+        esp.scale = 1;
+        esp.index_is_reg = 0;
+        esp.index_constant = 0;
+        esp.disp = q->arg1.const_int * 4;
+        two_reg_print(fout, "movl", convert_to_real(q->arg2), esp);
         break;
     }
     case CALL: {
 
-        int i;
-        for (i = (int)arg_arr_size - 1; i >= 0; --i) {
-            fprintft(fout, "pushl\t");
-            print_real_loc(fout, arg_arr[i]);
-            fprintf(fout, "\n");
-        }
-        for (i = 0; i < REGISTERCOUNT; ++i) {
-            if (reg_live_map[i]) {
-                fprintf(stderr,
-                        "SHOULDN'T HAPPEN live reg before function call\n");
-                exit(1);
-            }
-        }
-        fprintft(fout, "call\t");
+        // int i;
+        // for (i = (int)arg_arr_size - 1; i >= 0; --i) {
+        //     fprintf(fout,"\t" "pushl\t");
+        //     print_real_loc(fout, arg_arr[i]);
+        //     fprintf(fout, "\n");
+        // }
+        // for (i = 0; i < REGISTERCOUNT; ++i) {
+        //     if (reg_live_map[i]) {
+        //         fprintf(stderr,
+        //                 "SHOULDN'T HAPPEN live reg before function call\n");
+        //         exit(1);
+        //     }
+        // }
+        fprintf(fout, "\t"
+                      "call\t");
         struct RealLocation rl = convert_to_real(q->arg1);
         print_real_loc(fout, rl);
         fprintf(fout, "\n");
-        fprintft(fout, "addl\t$%lld, %%esp\n", last_arg_size);
+        // fprintf(fout,"\t" "addl\t$%lld, %%esp\n", last_arg_size);
         two_reg_print(fout, "movl", get_register(EAX), convert_to_real(q->eq));
-        arg_arr_size = 0;
-        free(arg_arr);
-        arg_arr = NULL;
+        // arg_arr_size = 0;
+        // free(arg_arr);
+        // arg_arr = NULL;
         kill_reg(EAX);
 
         break;
     }
     case RET:
-        two_reg_print(fout, "movl", convert_to_real(q->arg1),
-                      get_register(EAX));
-        kill_reg(EAX);
-        fprintft(fout, "leave\n");
-        fprintft(fout, "ret\n");
+        if (!(q->arg1.loc_type == REG && q->arg1.reg == EMPTY_VREG)) {
+            two_reg_print(fout, "movl", convert_to_real(q->arg1),
+                          get_register(EAX));
+            kill_reg(EAX);
+        }
+        fprintf(fout, "\t"
+                      "leave\n");
+        fprintf(fout, "\t"
+                      "ret\n");
         break;
     }
 }
@@ -1023,10 +1119,14 @@ void initalize_bss_var(FILE *fout, struct SymbolTableNode *node) {
         return;
     }
     if (node->val.sc.sl == SL_INTERNAL) {
-        fprintft(fout, ".local\n");
+        fprintf(fout, "\t"
+                      ".local\n");
     }
-    fprintft(fout, ".comm\t%s,%lld,%lld\n", node->name,
-             size_of_abstract(node->val.type), get_alignment(node->val.type));
+    fprintf(fout,
+            "\t"
+            ".comm\t%s,%lld,%lld\n",
+            node->name, size_of_abstract(node->val.type),
+            get_alignment(node->val.type));
 }
 
 void initalize_data_var(FILE *fout, struct SymbolTableNode *node) {
@@ -1035,49 +1135,79 @@ void initalize_data_var(FILE *fout, struct SymbolTableNode *node) {
         return;
     }
     if (node->val.sc.sl != SL_INTERNAL) {
-        fprintft(fout, ".globl\t%s\n", node->name);
+        fprintf(fout,
+                "\t"
+                ".globl\t%s\n",
+                node->name);
     }
     if (node->val.type->type == T_POINTER) {
         // its a string
-        fprintft(fout, ".section\t.rodata\n");
+        fprintf(fout, "\t"
+                      ".section\t.rodata\n");
         fprintf(fout, ".LC%lld:\n", unnamed_loc_val);
-        fprintft(fout, ".string\t%s\n",
-                 node->val.initalizer->strlit.original_str);
+        fprintf(fout,
+                "\t"
+                ".string\t%s\n",
+                node->val.initalizer->strlit.original_str);
     }
-    fprintft(fout, ".type\t%s, @object\n", node->name);
-    fprintft(fout, ".data\n");
+    fprintf(fout,
+            "\t"
+            ".type\t%s, @object\n",
+            node->name);
+    fprintf(fout, "\t"
+                  ".data\n");
     u64 alignment = get_alignment(node->val.type);
-    fprintft(fout, ".align %lld\n", alignment);
+    fprintf(fout,
+            "\t"
+            ".align %lld\n",
+            alignment);
     u64 size = size_of_abstract(node->val.type);
-    fprintft(fout, ".size %s, %lld\n", node->name, size);
+    fprintf(fout,
+            "\t"
+            ".size %s, %lld\n",
+            node->name, size);
     fprintf(fout, "%s:\n", node->name);
     if (node->val.type->type == T_POINTER) {
-        fprintft(fout, ".long\t.LC%lld", unnamed_loc_val++);
+        fprintf(fout,
+                "\t"
+                ".long\t.LC%lld",
+                unnamed_loc_val++);
         return;
     }
     if (node->val.type->type == T_CHAR) {
-        fprintft(fout, ".byte\t%c\n", node->val.initalizer->constant.val.chr);
+        fprintf(fout,
+                "\t"
+                ".byte\t%c\n",
+                node->val.initalizer->constant.val.chr);
     }
     if (size == 2) {
-        fprintft(fout, ".value\t%lld\n",
-                 node->val.initalizer->constant.type > TLONGLONG
-                     ? node->val.initalizer->constant.val.u_int
-                     : (i64)node->val.initalizer->constant.val.u_int);
+        fprintf(fout,
+                "\t"
+                ".value\t%lld\n",
+                node->val.initalizer->constant.type > TLONGLONG
+                    ? node->val.initalizer->constant.val.u_int
+                    : (i64)node->val.initalizer->constant.val.u_int);
     } else if (size == 4) {
-        fprintft(fout, ".long\t%lld\n",
-                 node->val.initalizer->constant.type > TLONGLONG
-                     ? node->val.initalizer->constant.val.u_int
-                     : (i64)node->val.initalizer->constant.val.u_int);
+        fprintf(fout,
+                "\t"
+                ".long\t%lld\n",
+                node->val.initalizer->constant.type > TLONGLONG
+                    ? node->val.initalizer->constant.val.u_int
+                    : (i64)node->val.initalizer->constant.val.u_int);
     } else if (size == 8) {
         u32 first =
             (node->val.initalizer->constant.val.u_int >> 4) & 0x0000FFFF;
         u32 second = node->val.initalizer->constant.val.u_int & 0x0000FFFF;
-        fprintft(fout, ".long\t%lld\n",
-                 node->val.initalizer->constant.type > TLONGLONG ? first
-                                                                 : (i64)first);
-        fprintft(fout, ".long\t%lld\n",
-                 node->val.initalizer->constant.type > TLONGLONG ? second
-                                                                 : (i64)second);
+        fprintf(fout,
+                "\t"
+                ".long\t%lld\n",
+                node->val.initalizer->constant.type > TLONGLONG ? first
+                                                                : (i64)first);
+        fprintf(fout,
+                "\t"
+                ".long\t%lld\n",
+                node->val.initalizer->constant.type > TLONGLONG ? second
+                                                                : (i64)second);
     }
 }
 

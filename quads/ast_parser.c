@@ -52,7 +52,7 @@ void update_jump_list(struct JumpList *head, size_t bbn) {
 }
 
 extern SIZEOF_TABLE TYPE_SIZE_TABLE;
-const OpInverter INVERTER = {1, 0, 5, 3, 4, 2};
+const OpInverter INVERTER = {1, 0, 5, 4, 3, 2};
 extern VReg next_vreg;
 int parse_ast(struct BasicBlockArr *bba, AstNode *ast, struct Location *pass,
               struct JumpList **continue_list, struct JumpList **break_list);
@@ -526,8 +526,10 @@ enum Operation invert_cmp(enum Operation op) {
         fprintf(stderr, "UNRECHABLE\n");
         exit(1);
     }
+    enum Operation result = INVERTER[op - start] + start;
+    fprintf(stderr, "start = %d, op = %d, result = %d", start, op, result);
 
-    return INVERTER[op - start] + start;
+    return result;
 }
 
 enum Operation get_op_from_child(struct BasicBlockArr *bba, AstNode *child,
@@ -754,6 +756,8 @@ void parse_binary_op(struct BasicBlockArr *bba, struct BinaryOp *bop,
             struct Quad q = make_quad(arg1, MOV, l, make_Location_empty_reg());
             append_quad(&CURRENT_BB, q);
             return;
+        } else {
+            fprintf(stderr, "I didn't move it?\n");
         }
         return;
     }
@@ -776,8 +780,10 @@ void parse_binary_op(struct BasicBlockArr *bba, struct BinaryOp *bop,
             make_quad(mem_addr, ADD, s_addr, make_Location_int(offset));
         append_quad(&CURRENT_BB, add_q);
         // LOAD
+        // TODO test
         if (bop->right->value_type->type != T_POINTER &&
             bop->right->value_type->type != T_ARR) {
+            // if (bop->right->value_type->type != T_ARR) {
             struct Quad q =
                 make_quad(eq_r, LOAD, mem_addr, make_Location_empty_reg());
             append_quad(&CURRENT_BB, q);

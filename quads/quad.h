@@ -31,7 +31,8 @@ enum Registers {
     EBX, // base register
     ESI, // string source register
     EDI, // string dest register
-    // ------- LONG TERM REGISTERS-------
+         // ------- LONG TERM REGISTERS-------
+    ESP
 };
 #define REGISTERCOUNT 6
 #define STARTREG 3
@@ -104,12 +105,12 @@ enum Operation {
     BRGEU,  // 5 11
 
     // get rvalue
-    CCEQ,  // 0  0
-    CCNEQ, // 1  2
-    CCLT,  // 2  4
-    CCLE,  // 3  6
-    CCGT,  // 4  8
-    CCGE,  // 5 10
+    CCEQ,  // 0  1
+    CCNEQ, // 1  0
+    CCLT,  // 2  5
+    CCLE,  // 3  4
+    CCGT,  // 4  3
+    CCGE,  // 5  2
 
     CCEQU,  // 0  1
     CCNEQU, // 1  3

@@ -1,8 +1,11 @@
 extern void printf();
 int main() {
-    char i;
+    int i;
     for (i = 'a'; i <= 'z'; ++i) {
-        printf("%c\n", i);
+        printf("char = %c\n", i);
+    }
+    for (i = 'A'; i <= 'Z'; ++i) {
+        printf("char = %c\n", i);
     }
     return 0;
 }
