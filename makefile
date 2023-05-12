@@ -1,7 +1,7 @@
 all: gip
 .PHONY: clean
 
-FLAGS = -Wall -Wextra
+FLAGS = -Wall -Wextra -lm
 
 parser.tab.c parser.tab.h: parser/parser.y
 	bison -v -k -d parser/parser.y
@@ -36,11 +36,14 @@ quad.o: quads/quad.c quads/quad.h
 ast_parser.o: quads/ast_parser.h quads/ast_parser.c
 	gcc $(FLAGS) -c quads/ast_parser.c -o ast_parser.o
 
+target.o: target_code/target.h target_code/target.c
+	gcc $(FLAGS) -c target_code/target.c -o target.o
+
 main.o: main.c
 	gcc $(FLAGS) -c main.c -o main.o
 
-gip: lex.o ast.o lexer_util.o parser.tab.o main.o symbol_table.o types.o quad.o ast_parser.o
-	gcc $(FLAGS) main.o lex.o lexer_util.o parser.tab.o ast.o symbol_table.o types.o quad.o ast_parser.o -o gip
+gip: lex.o ast.o lexer_util.o parser.tab.o main.o symbol_table.o types.o quad.o ast_parser.o target.o
+	gcc $(FLAGS) main.o lex.o lexer_util.o parser.tab.o ast.o symbol_table.o types.o quad.o ast_parser.o target.o -o gip
 
 lex_test.out: lex.o lexer_util.o lex_test.o
 	gcc $(FLAGS) lex.o lexer_util.o lex_test.o -o lex_test.out

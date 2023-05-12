@@ -22,6 +22,7 @@ typedef enum {
 
 typedef struct {
     char *str;
+    char *original_str;
     ConstantTypes type;
     int str_len;
 } YYlvalStrLit;

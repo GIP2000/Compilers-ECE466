@@ -98,7 +98,7 @@
 %token LN
 
 // types
-%type <astnode> constant primary_expression expression postfix_expression unary_expression cast_expression multiplicative_expression additive_expression shift_expression relational_expression equality_expression and_expression exclusive_or_expression inclusive_or_expression logical_and_expression logical_or_expression conditional_expression assignment_expression init_declarator_list initalizer parameter_list declaration statment compound_statment block_item_list block_item struct_declaration_list struct_declaration function_compount_statment selection_statment iteration_statment labeled_statment jump_statment expression_statment constant_expression
+%type <astnode> constant primary_expression expression postfix_expression unary_expression cast_expression multiplicative_expression additive_expression shift_expression relational_expression equality_expression and_expression exclusive_or_expression inclusive_or_expression logical_and_expression logical_or_expression conditional_expression assignment_expression init_declarator_list initalizer parameter_list declaration statment compound_statment block_item_list block_item struct_declaration_list struct_declaration function_compount_statment selection_statment iteration_statment labeled_statment jump_statment expression_statment constant_expression type_name
 
 %type <arg_expression_list> argument_expression_list
 %type <storage_class> storage_class_specifier
@@ -244,8 +244,7 @@ unary_expression: postfix_expression
                     $$ = make_unary_op(SIZEOF, $2);
                 }
                 | SIZEOF '(' type_name ')' {
-                    yyerror("UNIMPLEMNTED");
-                    exit(1);
+                    $$ = make_unary_op(SIZEOF, $3);
                 }
 
                 | _ALIGNOF '(' type_name ')' {
@@ -463,6 +462,12 @@ init_declarator_list: init_declarator {
                     struct Type *t = add_to_end_and_reverse($1.val.type, $<current_symbol>0.val.type);
                         struct SymbolTableNode n = make_st_node($1.name, $1.namespc, $1.type, $<current_symbol>0.val.sc, t,$1.val.initalizer);
                         /* // TODO fill in IDENT TYPE */
+
+
+                        if(n.val.initalizer != NULL && !types_are_eq(n.val.type, n.val.initalizer->value_type)) {
+                            yyerror("Incompatible types for initilizer");
+                            exit(2);
+                        }
                         if(!enter_in_namespace(n, ORD)) { //TODO ord is Temporary
                            yyerror("Varaible redefinition");
                            exit(2);
@@ -494,6 +499,14 @@ init_declarator_list: init_declarator {
 
 init_declarator: declarator {$$ = $1.node;}
                | declarator '=' initalizer {
+                    if ($1.st->st_type != GLOBAL)  {
+                        fprintf(stderr, "UNIMPLEMNTED  NON GLOABL INITALIZER\n");
+                        exit(1);
+                    }
+                    if($3->type != ASTNODE_CONSTANT && $3->type != ASTNODE_STRLIT) {
+                        fprintf(stderr, "UNIMPLEMNTED  NON CONSTANT VALUE INITALIZER\n");
+                        exit(1);
+                    }
                     $1.node.val.initalizer = $3;
                     $$ = $1.node;
                }
@@ -787,7 +800,7 @@ direct_declarator: IDENT {
                  } // Optional
                  | direct_declarator '(' {create_scope(PROTOTYPE);} ')' {
                     $1.st = shallow_pop_table();
-                    $1.node.val.type = make_func_type(NULL, NULL, 0);
+                    $1.node.val.type = make_func_type(NULL, $1.st, 0);
                     $1.node.type = FUNCTION;
                     $$ = $1;
                  }
@@ -848,8 +861,16 @@ identifier_list: IDENT
                ;
 
 // 6.7.7
-type_name: specifier_qualifer_list abstract_declarator // Optional
-         | specifier_qualifer_list
+type_name: specifier_qualifer_list abstract_declarator {
+            print_type($2.node.val.type);
+            printf("<- ad type \n");
+            $$ = make_AstNode(ASTNODE_TYPENAME);
+            $$->value_type = add_to_end_and_reverse($2.node.val.type, $1);
+            print_type($$->value_type);
+            printf("<- sizeof type \n");
+
+         }// Optional
+         | specifier_qualifer_list {$$ = make_AstNode(ASTNODE_TYPENAME); $$->value_type = $1;}
          ;
 
 abstract_declarator: pointer {
@@ -910,6 +931,7 @@ direct_abstract_declarator: '(' abstract_declarator ')' {$$ = $2;}
                     /* $1.node.val.type = merge_if_next($1.node.val.type, make_next_type(T_ARR, NULL)); */
                     $1.node.val.type = make_next_type(T_ARR, $1.node.val.type);
                     $$ = $1;
+                    $$.node.val.type->extentions.next_type.arr_size_expression = $3;
                  }
                           |  '[' type_qualifier_list assignment_expression ']'{
                              $$ = make_st_node_pair(make_st_node(NULL, ORD, 0, get_default_sc(), make_next_type(T_ARR, NULL), NULL));
@@ -965,7 +987,7 @@ direct_abstract_declarator: '(' abstract_declarator ')' {$$ = $2;}
                           }// Double Optional
                           | direct_abstract_declarator '(' {create_scope(PROTOTYPE);} ')' {
                             $1.st = shallow_pop_table();
-                            $1.node.val.type = make_func_type(NULL, NULL, 0);
+                            $1.node.val.type = make_func_type(NULL, $1.st, 0);
                             $1.node.type = FUNCTION;
                             $$ = $1;
                           }
@@ -974,7 +996,7 @@ direct_abstract_declarator: '(' abstract_declarator ')' {$$ = $2;}
                               $$.st = shallow_pop_table();
                           }
                           | '('{create_scope(PROTOTYPE);} ')' {
-                             $$ = make_st_node_pair(make_st_node(NULL, ORD, FUNCTION, get_default_sc(), make_func_type(NULL, NULL, 0), NULL));
+                             $$ = make_st_node_pair(make_st_node(NULL, ORD, FUNCTION, get_default_sc(), make_func_type(NULL, symbol_table, 0), NULL));
                              $$.st = shallow_pop_table();
                           }
                           ;

@@ -60,4 +60,8 @@ parser.output
 # executable Name
 gip
 
+# Assembly output
+*.S
+
+# macos files
 **/*/.DS_STORE

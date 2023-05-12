@@ -1,9 +1,51 @@
 #include "./quad.h"
 #include <stdio.h>
 #include <stdlib.h>
+#include <string.h>
 
 VReg next_vreg = VREG_START;
 const size_t INITAL_CAP = 100;
+
+struct VRegCounter v_reg_counter;
+
+void debug_print_vrc() {
+    i64 i;
+    for (i = 0; i < v_reg_counter.cap; ++i) {
+        fprintf(stderr, "%%T%lld = %zu\n", i, v_reg_counter.arr[i].count);
+    }
+}
+
+void initalize_counter() {
+    static int first = 1;
+    if (!first) {
+        first = 0;
+        v_reg_counter.cap = 100;
+        free(v_reg_counter.arr);
+    }
+    v_reg_counter.cap = 100;
+    v_reg_counter.arr = (struct VRegCounterNode *)malloc(
+        sizeof(struct VRegCounterNode) * v_reg_counter.cap);
+    memset(v_reg_counter.arr, 0, v_reg_counter.cap);
+}
+
+void increment_location(struct Location l) {
+    if (!(l.loc_type == REG && l.reg != EMPTY_VREG)) {
+        return;
+    }
+    if (v_reg_counter.cap <= l.reg) {
+        size_t old_cap = v_reg_counter.cap;
+        v_reg_counter.cap = l.reg * 2;
+        v_reg_counter.arr = realloc(v_reg_counter.arr, v_reg_counter.cap);
+        memset(v_reg_counter.arr + v_reg_counter.cap, 0,
+               v_reg_counter.cap - old_cap);
+    }
+    ++v_reg_counter.arr[l.reg].count;
+}
+void increment_quad_locs(struct Quad quad) {
+    increment_location(quad.eq);
+    increment_location(quad.arg1);
+    increment_location(quad.arg2);
+}
 
 struct Location make_Location_int(long long v) {
     struct Location l;
@@ -47,12 +89,20 @@ struct Location make_Location_var(struct SymbolTableNode *v) {
     l.deref = 0;
     return l;
 }
+struct Location make_Location_str(YYlvalStrLit strlit) {
+    struct Location l;
+    l.loc_type = CONSTSTR;
+    l.strlit = strlit;
+    l.deref = 0;
+    return l;
+}
 
 struct BasicBlockArr initalize_BasicBlockArr(size_t inital_cap) {
     struct BasicBlockArr bba;
     bba.cap = inital_cap > 0 ? inital_cap : INITAL_CAP;
     bba.len = 0;
     bba.arr = (struct BasicBlock *)malloc(sizeof(struct BasicBlock) * bba.cap);
+    initalize_counter();
     return bba;
 }
 
@@ -75,6 +125,8 @@ struct BasicBlock make_bb(struct SymbolTableNode *ref) {
     bb.ref = ref;
     bb.head = NULL;
     bb.tail = NULL;
+    bb.last_v_reg_used = next_vreg - 1;
+    bb.first_v_reg_used = next_vreg - 1;
     return bb;
 }
 
@@ -99,14 +151,19 @@ struct Quad *append_quad(struct BasicBlock *bb, struct Quad quad) {
         bb->tail->next = qn;
     }
     bb->tail = qn;
+    increment_quad_locs(quad);
+    bb->last_v_reg_used = next_vreg - 1;
     return &bb->tail->quad;
 }
 
 void print_location(struct Location *loc) {
-    if (loc->deref)
+    int i;
+    for (i = loc->deref; i > 0; --i)
         printf("[");
     if (loc->loc_type == VAR)
         printf("%s", loc->var->name);
+    else if (loc->loc_type == CONSTSTR)
+        printf("\"%s\"", loc->strlit.original_str);
     else if (loc->loc_type == CONSTINT)
         printf("%lld", loc->const_int);
     else if (loc->loc_type == CONSTFLOAT)
@@ -115,7 +172,7 @@ void print_location(struct Location *loc) {
         printf("BB%zu", loc->bbn);
     } else if (loc->reg != EMPTY_VREG)
         printf("%%T%04d", loc->reg);
-    if (loc->deref)
+    for (i = loc->deref; i > 0; --i)
         printf("]");
 }
 
@@ -165,9 +222,6 @@ void print_op(enum Operation op) {
         break;
 
     // LOGICAL
-    case LOGNOT:
-        printf("LOGNOT");
-        break;
     case MOD:
         printf("MOD");
         break;

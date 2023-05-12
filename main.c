@@ -6,6 +6,7 @@
 #include "parser/symbol_table.h"
 #include "quads/ast_parser.h"
 #include "quads/quad.h"
+#include "target_code/target.h"
 #include <limits.h>
 #include <stddef.h>
 #include <stdio.h>
@@ -37,6 +38,7 @@ int main(int argc, char **argv) {
         print_st(symbol_table);
         struct BasicBlockArr arr = build_bba_from_st(symbol_table);
         print_bba(&arr);
+        output_asm("a.S", &arr, symbol_table);
         return 0;
     }
     int i;
@@ -62,6 +64,13 @@ int main(int argc, char **argv) {
         // pop_global_table();
         struct BasicBlockArr arr = build_bba_from_st(symbol_table);
         print_bba(&arr);
+        if (argc == 2) {
+            output_asm("a.S", &arr, symbol_table);
+        } else {
+            char output_file[5];
+            sprintf(output_file, "a%d.S", i);
+            output_asm(output_file, &arr, symbol_table);
+        }
         symbol_table = initalize_table(10);
     }
     return 0;

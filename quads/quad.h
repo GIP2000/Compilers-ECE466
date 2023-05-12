@@ -3,15 +3,50 @@
 #include "../parser/symbol_table.h"
 #include <stddef.h>
 
+// Virtual Register counter
 typedef unsigned int VReg;
-#define EMPTY_VREG 0
-#define VREG_START 1
+
 // number of the virtual register to use.
 // the number 0 represents a null register
 // ie there is no arg (b = a++ has one arg only) or eq (*d = 1; would not have
 // an eq since its a STORE type command)
+#define EMPTY_VREG 0
+#define VREG_START 1
 
-enum LocationType { REG, VAR, CONSTINT, CONSTFLOAT, BASICBLOCKNUM };
+// Registers that we can use
+enum Registers {
+    // ------- CONTROL FLOW -------
+    NONE = 0, // not assigned yet
+    SPILL,    // if the register was spilled onto the stack
+    EBP,      // register for bp (refrencing other local variables / parameters)
+    // ------- CONTROL FLOW -------
+
+    // ------- SCRATCH REGISTERS-------
+    EAX, // acc register
+    EDX, // data register
+    ECX, // count register
+    // ------- SCRATCH REGISTERS-------
+
+    // ------- LONG TERM REGISTERS-------
+    EBX, // base register
+    ESI, // string source register
+    EDI, // string dest register
+         // ------- LONG TERM REGISTERS-------
+    ESP
+};
+#define REGISTERCOUNT 6
+#define STARTREG 3
+
+enum LocationType { REG, VAR, CONSTINT, CONSTFLOAT, CONSTSTR, BASICBLOCKNUM };
+
+struct VRegCounter {
+    i64 cap;
+    struct VRegCounterNode {
+        size_t count;
+        enum Registers real_reg;
+        i64 spill_offset;
+    } *arr;
+};
 
 struct Location {
     enum LocationType loc_type; // 0 if reg 1 if var
@@ -22,6 +57,7 @@ struct Location {
         long double const_float;
         long long const_int;
         size_t bbn;
+        YYlvalStrLit strlit;
     };
 };
 
@@ -69,12 +105,12 @@ enum Operation {
     BRGEU,  // 5 11
 
     // get rvalue
-    CCEQ,  // 0  0
-    CCNEQ, // 1  2
-    CCLT,  // 2  4
-    CCLE,  // 3  6
-    CCGT,  // 4  8
-    CCGE,  // 5 10
+    CCEQ,  // 0  1
+    CCNEQ, // 1  0
+    CCLT,  // 2  5
+    CCLE,  // 3  4
+    CCGT,  // 4  3
+    CCGE,  // 5  2
 
     CCEQU,  // 0  1
     CCNEQU, // 1  3
@@ -84,7 +120,7 @@ enum Operation {
     CCGEU,  // 5 11
 
     //
-    LOGNOT,
+    // LOGNOT, REMOVED because it doesn't make sense
     // function stuff
     ARGBEGIN,
     ARG,
@@ -127,6 +163,8 @@ struct BasicBlock {
     struct QuadListNode *head;
     struct QuadListNode *tail;
     struct SymbolTableNode *ref;
+    VReg last_v_reg_used;
+    VReg first_v_reg_used;
 };
 
 struct BasicBlockArr {
@@ -135,12 +173,14 @@ struct BasicBlockArr {
     size_t len;
 };
 
+void debug_print_vrc();
 struct Location make_Location_int(long long v);
 struct Location make_Location_float(long double v);
 struct Location make_Location_reg();
 struct Location make_Location_empty_reg();
 struct Location make_Location_var(struct SymbolTableNode *v);
 struct Location make_Location_BB(size_t bbn);
+struct Location make_Location_str(YYlvalStrLit strlit);
 
 struct BasicBlockArr initalize_BasicBlockArr(size_t cap);
 void append_basic_block(struct BasicBlockArr *bba, struct BasicBlock bb);

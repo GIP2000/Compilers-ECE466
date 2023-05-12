@@ -1,4 +1,5 @@
 #pragma once
+#include "../macro_util.h"
 #include "ast.h"
 #include <stdint.h>
 #include <stdlib.h>
@@ -57,7 +58,8 @@ struct SymbolTableNode {
     enum IdentType type;
     struct DebugFileInfo fi;
     int offset_marked;
-    unsigned long long offset;
+    i64 offset;
+    enum SymbolTableType symbol_loc;
     struct {
         // enum StorageClass sc;
         struct EffectiveStorageClass sc;

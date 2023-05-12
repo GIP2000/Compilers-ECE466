@@ -4,16 +4,27 @@
 #include "./quad.h"
 #include <stdio.h>
 
-// static long int target_bbn = -1;
-// int in_chain = 0;
-// #define CURRENT_BB bba->arr[target_bbn >= 0 ? target_bbn : bba->len - 1]
 #define CURRENT_BB bba->arr[bba->len - 1]
+
+extern struct VRegCounter v_reg_counter;
 
 struct JumpList {
     struct Quad *q_to_update;
     struct JumpList *next;
 };
 
+void dec_counter_on_delete_l(struct Location l) {
+    if (l.loc_type == REG && l.reg != EMPTY_VREG) {
+        v_reg_counter.arr[l.reg].count--;
+    }
+}
+void dec_counter_on_delete(struct Quad q) {
+    dec_counter_on_delete_l(q.eq);
+    dec_counter_on_delete_l(q.arg1);
+    dec_counter_on_delete_l(q.arg2);
+}
+
+enum Operation invert_cmp(enum Operation op);
 struct JumpList *push_jump_list(struct JumpList *head, struct Quad *quad) {
 
     struct JumpList *new_head =
@@ -41,11 +52,10 @@ void update_jump_list(struct JumpList *head, size_t bbn) {
 }
 
 extern SIZEOF_TABLE TYPE_SIZE_TABLE;
-const OpInverter INVERTER = {1, 0, 5, 3, 4, 2};
+const OpInverter INVERTER = {1, 0, 5, 4, 3, 2};
 extern VReg next_vreg;
 int parse_ast(struct BasicBlockArr *bba, AstNode *ast, struct Location *pass,
               struct JumpList **continue_list, struct JumpList **break_list);
-u64 size_of_abstract(struct Type *t);
 u64 get_struct_size(struct Type *t);
 u64 get_union_size(struct Type *t);
 struct Quad *replace_cc_with_br(struct BasicBlockArr *bba, enum Operation *op,
@@ -73,6 +83,7 @@ u64 get_union_size(struct Type *t) {
             current_type = current_type->extentions.next_type.next;
         }
         u64 current_alignment = size_of_abstract(current_type);
+        current_alignment = MIN(current_alignment, 4);
         max_size = current > max_size ? current : max_size;
         max_alignment = current_alignment > max_alignment ? current_alignment
                                                           : max_alignment;
@@ -101,6 +112,7 @@ u64 get_struct_size(struct Type *t) {
             current_type = current_type->extentions.next_type.next;
         }
         u64 this_alignment = size_of_abstract(current_type);
+        this_alignment = MIN(4, this_alignment);
         u64 padding =
             (size + current_size) % this_alignment == 0
                 ? 0
@@ -146,7 +158,7 @@ u64 size_of_abstract(struct Type *t) {
         return result;
     }
     if (result == 0) {
-        fprintf(stderr, "Invalid argument to sizeof");
+        fprintf(stderr, "Invalid argument to sizeof\n");
         exit(3);
     }
     // is struct, union or array
@@ -159,7 +171,6 @@ u64 size_of_abstract(struct Type *t) {
 
 struct BasicBlockArr build_bba_from_st(struct SymbolTable *st) {
     struct BasicBlockArr bba = initalize_BasicBlockArr(100);
-
     size_t i;
     for (i = 0; i < st->len; ++i) {
         if (st->nodearr[i]->type != FUNCTION ||
@@ -205,6 +216,8 @@ struct Location get_loc_pos_is_val(AstNode *node) {
         else
             result = make_Location_int((i64)node->constant.val.chr);
 
+    } else if (node->type == ASTNODE_STRLIT) {
+        result = make_Location_str(node->strlit);
     } else {
         result = make_Location_var(node->ident);
     }
@@ -268,6 +281,7 @@ void parse_unary_op(struct BasicBlockArr *bba, struct UnaryOp *uop,
             get_loc_from_parse_ast(is_val, uop->child, bba, &last_quad);
         if (last_quad.op == LOAD) {
             struct Quad q = make_quad(eq_r, MOV, last_quad.arg1, arg2);
+            dec_counter_on_delete(CURRENT_BB.tail->quad);
             CURRENT_BB.tail->quad = q;
             return;
         }
@@ -277,10 +291,15 @@ void parse_unary_op(struct BasicBlockArr *bba, struct UnaryOp *uop,
     }
     case '*': {
         if (uop->child->value_type->type != T_POINTER) {
+            exit(3);
             fprintf(stderr, "Can't Deref a non pointer type");
         }
         int is_val =
             parse_ast(bba, uop->child, NULL, continue_list, break_list);
+        if (uop->child->value_type->extentions.next_type.next->type == T_ARR) {
+            // stops me from loading an array that doesn't exist
+            return;
+        }
         struct Location arg1 =
             get_loc_from_parse_ast(is_val, uop->child, bba, NULL);
         struct Quad q = make_quad(eq_r, LOAD, arg1, arg2);
@@ -319,10 +338,18 @@ void parse_unary_op(struct BasicBlockArr *bba, struct UnaryOp *uop,
     case '!': {
         int is_val =
             parse_ast(bba, uop->child, NULL, continue_list, break_list);
+        struct Quad last_q;
         struct Location arg1 =
-            get_loc_from_parse_ast(is_val, uop->child, bba, NULL);
-        struct Quad q = make_quad(eq_r, LOGNOT, arg1, arg2);
-
+            get_loc_from_parse_ast(is_val, uop->child, bba, &last_q);
+        if (last_q.op >= BREQ && last_q.op <= CCGEU) {
+            CURRENT_BB.tail->quad.op = invert_cmp(last_q.op);
+            return;
+        }
+        struct Location l = make_Location_reg();
+        struct Quad q = make_quad(l, CMP, arg1, make_Location_int(0));
+        append_quad(&CURRENT_BB, q);
+        q = make_quad(eq_r, CCEQ, make_Location_empty_reg(),
+                      make_Location_empty_reg());
         append_quad(&CURRENT_BB, q);
         return;
     }
@@ -357,8 +384,9 @@ void parse_unary_op(struct BasicBlockArr *bba, struct UnaryOp *uop,
         if (uop->child->type == ASTNODE_IDENT) {
             origin = make_Location_var(uop->child->ident);
         } else {
-            origin = last_quad.arg1;
-            origin.deref = 1;
+            origin = last_quad.arg1; // maybe delete
+            // origin.deref = 1;
+            ++origin.deref;
         }
         struct Quad q = make_quad(origin, ADD, arg1, one_const);
         append_quad(&CURRENT_BB, q);
@@ -398,7 +426,8 @@ void parse_unary_op(struct BasicBlockArr *bba, struct UnaryOp *uop,
         // do the add
         struct Location origin = make_Location_var(uop->child->ident);
         if (uop->child->type != ASTNODE_IDENT) {
-            origin.deref = 1;
+            // origin.deref = 1;
+            ++origin.deref;
         }
         struct Quad q = make_quad(origin, SUB, arg1, one_const);
         append_quad(&CURRENT_BB, q);
@@ -445,7 +474,8 @@ void do_assignment_math(struct BasicBlockArr *bba, struct BinaryOp *bop,
         struct Location arg1 = arg1_val;
         if (!is_val) {
             arg1 = last_quad.arg1;
-            arg1.deref = 1;
+            ++arg1.deref;
+            // arg1.deref = 1;
         }
         struct Quad q = make_quad(arg1, op, arg2, arg1_val);
         append_quad(&CURRENT_BB, q);
@@ -496,8 +526,10 @@ enum Operation invert_cmp(enum Operation op) {
         fprintf(stderr, "UNRECHABLE\n");
         exit(1);
     }
+    enum Operation result = INVERTER[op - start] + start;
+    fprintf(stderr, "start = %d, op = %d, result = %d", start, op, result);
 
-    return INVERTER[op - start] + start;
+    return result;
 }
 
 enum Operation get_op_from_child(struct BasicBlockArr *bba, AstNode *child,
@@ -655,8 +687,26 @@ void parse_binary_op(struct BasicBlockArr *bba, struct BinaryOp *bop,
         return do_normal_math(bba, bop, &eq_r, BISHR, continue_list,
                               break_list);
     case PLUSEQ:
+        if (bop->left->value_type->type == T_POINTER) {
+            bop->right->constant.val.u_int *= size_of_abstract(
+                bop->left->value_type->extentions.next_type.next);
+        } else if (bop->right->value_type->type == T_POINTER) {
+            bop->left->constant.val.u_int *= size_of_abstract(
+                bop->right->value_type->extentions.next_type.next);
+        }
         return do_assignment_math(bba, bop, ADD, continue_list, break_list);
     case MINUSEQ:
+        if (bop->left->value_type->type == T_POINTER &&
+            bop->right->value_type->type == T_POINTER) {
+            return do_assignment_math(bba, bop, SUB, continue_list, break_list);
+        }
+        if (bop->left->value_type->type == T_POINTER) {
+            bop->right->constant.val.u_int *= size_of_abstract(
+                bop->left->value_type->extentions.next_type.next);
+        } else if (bop->right->value_type->type == T_POINTER) {
+            bop->left->constant.val.u_int *= size_of_abstract(
+                bop->right->value_type->extentions.next_type.next);
+        }
         return do_assignment_math(bba, bop, SUB, continue_list, break_list);
     case TIMESEQ:
         return do_assignment_math(bba, bop, MUL, continue_list, break_list);
@@ -690,7 +740,8 @@ void parse_binary_op(struct BasicBlockArr *bba, struct BinaryOp *bop,
                 get_loc_from_parse_ast(is_val_2, bop->right, bba, NULL);
             if (!is_val) {
                 arg1 = last_quad.arg1;
-                arg1.deref = 1;
+                // arg1.deref = 1;
+                ++arg1.deref;
             }
             struct Quad q =
                 make_quad(arg1, MOV, arg2, make_Location_empty_reg());
@@ -705,6 +756,8 @@ void parse_binary_op(struct BasicBlockArr *bba, struct BinaryOp *bop,
             struct Quad q = make_quad(arg1, MOV, l, make_Location_empty_reg());
             append_quad(&CURRENT_BB, q);
             return;
+        } else {
+            fprintf(stderr, "I didn't move it?\n");
         }
         return;
     }
@@ -727,9 +780,14 @@ void parse_binary_op(struct BasicBlockArr *bba, struct BinaryOp *bop,
             make_quad(mem_addr, ADD, s_addr, make_Location_int(offset));
         append_quad(&CURRENT_BB, add_q);
         // LOAD
-        struct Quad q =
-            make_quad(eq_r, LOAD, mem_addr, make_Location_empty_reg());
-        append_quad(&CURRENT_BB, q);
+        // TODO test
+        if (bop->right->value_type->type != T_POINTER &&
+            bop->right->value_type->type != T_ARR) {
+            // if (bop->right->value_type->type != T_ARR) {
+            struct Quad q =
+                make_quad(eq_r, LOAD, mem_addr, make_Location_empty_reg());
+            append_quad(&CURRENT_BB, q);
+        }
         return;
     }
     case INDSEL: {
@@ -858,6 +916,7 @@ struct Quad *replace_cc_with_br(struct BasicBlockArr *bba, enum Operation *op,
         *op -= CMPLEN * 2;
         q.op = *op;
         if (CURRENT_BB.tail->quad.eq.loc_type != VAR) {
+            dec_counter_on_delete(CURRENT_BB.tail->quad);
             CURRENT_BB.tail->quad = q;
             first_branch = &CURRENT_BB.tail->quad;
             return first_branch;
@@ -1075,7 +1134,7 @@ int parse_ast(struct BasicBlockArr *bba, AstNode *ast, struct Location *eq,
     case ASTNODE_CONSTANT:
         return 1;
     case ASTNODE_STRLIT:
-        break;
+        return 1;
     case ASTNODE_IDENT:
         return 1;
     case ASTNODE_UNARYOP:

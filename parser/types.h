@@ -50,8 +50,9 @@ struct Type {
             struct Type *ret;
             struct AstNode *statment;
 
-            size_t arg_count;
             int has_variable_args;
+            struct SymbolTable *scope;
+            size_t arg_count;
             struct Type *args;
         } func;
         struct {
